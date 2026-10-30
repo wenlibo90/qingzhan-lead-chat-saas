@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>轻站平台运营 · Ops Console</title>
+  <link rel="stylesheet" href="/assets/apollo-ui.css">
+  <link rel="stylesheet" href="/admin/styles.css">
+  <link rel="stylesheet" href="/ops/ops.css">
+</head>
+<body>
+  <div id="boot-screen" class="boot-screen"><div class="boot-logo">运</div><div class="boot-spinner"></div><p>正在加载运营控制台</p></div>
+  <div id="ops-login" class="ops-login" hidden></div>
+  <div id="ops-app" class="app-shell" hidden>
+    <aside id="ops-sidebar" class="sidebar ops-sidebar"></aside>
+    <div class="app-main">
+      <header id="ops-topbar" class="topbar"></header>
+      <main id="ops-page" class="page"></main>
+    </div>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toast-root" class="toast-root"></div>
+  <script src="/assets/apollo-ui.js"></script>
+  <script src="/ops/app.js"></script>
+  <script src="/ops/pages.js"></script>
+  <script src="/ops/pages-tickets.js"></script>
+  <script>Ops.boot();</script>
+</body>
+</html>

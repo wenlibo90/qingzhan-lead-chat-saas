@@ -3,21 +3,22 @@ const express = require('express');
 const crypto = require('node:crypto');
 const { all, get, run, json } = require('../db');
 const { authRequired, requireRole, featureGate } = require('../auth');
-const { siteScope, audit, sitePublic } = require('../helpers');
+const { siteScope, audit, sitePublic, publicBase } = require('../helpers');
 const { hasFeature, limitOf, featureLabel, FEATURES } = require('../plans');
 const { upload, publicUrl } = require('../upload');
+const { loaderToken } = require('../services/provision');
 
 const router = express.Router();
 router.use(authRequired);
 
-function baseUrl(req) {
-  return process.env.PUBLIC_BASE || `${req.protocol}://${req.get('host')}`;
-}
+function baseUrl(req) { return publicBase(req); }
 
 function countLimitCheck(req, res, kind) {
   const limit = limitOf(req.tenant.plan, kind);
   if (limit === -1) return null;
-  const current = get(`SELECT COUNT(*) c FROM ${kind === 'agents' ? 'users' : 'sites'} WHERE tenant_id = ?`, [req.tenant.id]).c;
+  const current = kind === 'agents'
+    ? get('SELECT COUNT(*) c FROM users WHERE tenant_id = ?', [req.tenant.id]).c
+    : get('SELECT COUNT(*) c FROM sites WHERE tenant_id = ? AND is_sandbox = 0', [req.tenant.id]).c;
   if (current >= limit) {
     return res.status(403).json({ error: `${req.tenant.plan === 'free' ? '免费版' : '当前套餐'}最多支持 ${limit} 个${kind === 'agents' ? '子账号' : '站点'}，请升级套餐`, code: 'PLAN_LIMIT' });
   }
@@ -58,10 +59,10 @@ function sanitizeConfig(input, plan) {
     theme: ['light', 'dark', 'auto'].includes(c.theme) ? c.theme : 'light',
     quickReplies: Array.isArray(c.quickReplies) ? c.quickReplies.slice(0, 6).map((x) => String(x).slice(0, 30)) : ['想了解价格', '怎么接入', '预约演示'],
     compliance: {
-      enabled: c.compliance ? c.compliance.enabled !== false : true,
-      required: !!(c.compliance && c.compliance.required),
-      text: String((c.compliance && c.compliance.text) || '我们使用 Cookie 记录访问轨迹以改善服务，您可以选择拒绝。').slice(0, 400),
-      policyUrl: String((c.compliance && c.compliance.policyUrl) || '').slice(0, 300)
+      enabled: false,
+      required: false,
+      text: '',
+      policyUrl: ''
     },
     languages: hasFeature(plan, 'translation') ? (Array.isArray(c.languages) ? c.languages.slice(0, 5) : ['zh-CN', 'en-US']) : ['zh-CN']
   };
@@ -71,7 +72,7 @@ function sanitizeConfig(input, plan) {
 router.get('/sites', (req, res) => {
   const sites = all('SELECT * FROM sites WHERE tenant_id = ? ORDER BY id', [req.tenant.id]);
   const data = sites.map((s) => {
-    const pub = sitePublic(s, req.tenant.plan);
+    const pub = sitePublic(s, req.tenant.plan, baseUrl(req));
     const stats = {
       visitors: get('SELECT COUNT(*) c FROM visitors WHERE site_id = ?', [s.id]).c,
       conversations: get('SELECT COUNT(*) c FROM conversations WHERE site_id = ?', [s.id]).c,
@@ -80,7 +81,7 @@ router.get('/sites', (req, res) => {
     };
     return {
       ...pub,
-      embed_code: `<script async src="${baseUrl(req)}/widget.js?key=${s.site_key}"></script>`,
+      embed_code: `<script async src="${baseUrl(req)}/qz.js?${s.loader_token}"></script>`,
       stats,
       created_at: s.created_at
     };
@@ -94,11 +95,11 @@ router.post('/sites', requireRole('admin', 'operator'), (req, res) => {
   const name = String(req.body.name || '').trim().slice(0, 50);
   if (!name) return res.status(400).json({ error: '请填写站点名称' });
   const key = `qz_${crypto.randomBytes(7).toString('hex')}`;
-  const id = run('INSERT INTO sites (tenant_id, name, domain, site_key, widget_config) VALUES (?,?,?,?,?)',
-    [req.tenant.id, name, String(req.body.domain || '').slice(0, 120), key, JSON.stringify(sanitizeConfig({}, req.tenant.plan))]).lastInsertRowid;
+  const id = run('INSERT INTO sites (tenant_id, name, domain, site_key, loader_token, widget_config) VALUES (?,?,?,?,?,?)',
+    [req.tenant.id, name, String(req.body.domain || '').slice(0, 120), key, loaderToken(), JSON.stringify(sanitizeConfig({}, req.tenant.plan))]).lastInsertRowid;
   audit(req, 'site.create', `site:${id}`, name);
   const site = get('SELECT * FROM sites WHERE id = ?', [id]);
-  res.json({ ok: true, site: sitePublic(site, req.tenant.plan) });
+  res.json({ ok: true, site: sitePublic(site, req.tenant.plan, baseUrl(req)) });
 });
 
 router.patch('/sites/:id', requireRole('admin', 'operator'), (req, res) => {
@@ -115,16 +116,17 @@ router.patch('/sites/:id', requireRole('admin', 'operator'), (req, res) => {
   if (body.compliance_enabled !== undefined) run('UPDATE sites SET compliance_enabled = ? WHERE id = ?', [body.compliance_enabled ? 1 : 0, site.id]);
   audit(req, 'site.update', `site:${site.id}`, Object.keys(body).join(','));
   const fresh = get('SELECT * FROM sites WHERE id = ?', [site.id]);
-  res.json({ ok: true, site: sitePublic(fresh, req.tenant.plan) });
+  res.json({ ok: true, site: sitePublic(fresh, req.tenant.plan, baseUrl(req)) });
 });
 
 router.post('/sites/:id/rotate-key', requireRole('admin'), (req, res) => {
   const site = get('SELECT * FROM sites WHERE id = ? AND tenant_id = ?', [Number(req.params.id), req.tenant.id]);
   if (!site) return res.status(404).json({ error: '站点不存在' });
   const key = `qz_${crypto.randomBytes(7).toString('hex')}`;
-  run('UPDATE sites SET site_key = ? WHERE id = ?', [key, site.id]);
+  const token = loaderToken();
+  run('UPDATE sites SET site_key = ?, loader_token = ? WHERE id = ?', [key, token, site.id]);
   audit(req, 'site.rotate_key', `site:${site.id}`, key);
-  res.json({ ok: true, site_key: key, embed_code: `<script async src="${baseUrl(req)}/widget.js?key=${key}"></script>` });
+  res.json({ ok: true, site_key: key, loader_token: token, embed_code: `<script async src="${baseUrl(req)}/qz.js?${token}"></script>` });
 });
 
 router.get('/sites/:id/embed', (req, res) => {
@@ -132,9 +134,9 @@ router.get('/sites/:id/embed', (req, res) => {
   if (!site) return res.status(404).json({ error: '站点不存在' });
   res.json({
     site_key: site.site_key,
-    embed_code: `<script async src="${baseUrl(req)}/widget.js?key=${site.site_key}"></script>`,
-    npm: `import '${baseUrl(req)}/widget.js?key=${site.site_key}'`,
-    url: `${baseUrl(req)}/widget.js?key=${site.site_key}`
+    embed_code: `<script async src="${baseUrl(req)}/qz.js?${site.loader_token}"></script>`,
+    npm: `import '${baseUrl(req)}/qz.js?${site.loader_token}'`,
+    url: `${baseUrl(req)}/qz.js?${site.loader_token}`
   });
 });
 

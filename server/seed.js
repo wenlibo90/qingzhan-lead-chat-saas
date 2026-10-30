@@ -1,6 +1,7 @@
 'use strict';
 const { db, run, get, all, tx } = require('./db');
 const { hashPassword, signApiKey } = require('./auth');
+const { createWorkspace, loaderToken } = require('./services/provision');
 
 function pad(n) { return String(n).padStart(2, '0'); }
 function fmt(d) {
@@ -98,7 +99,7 @@ const REQUIREMENTS = [
 ];
 
 function clear() {
-  const tables = ['visitor_tags', 'follow_ups', 'leads', 'form_submissions', 'forms', 'messages', 'conversations', 'events', 'pageviews', 'visitor_sessions', 'recordings', 'visitors', 'faqs', 'faq_categories', 'knowledge_files', 'rules', 'rule_logs', 'canned_replies', 'tags', 'blacklist', 'announcements', 'notifications', 'notification_channels', 'api_keys', 'audit_logs', 'sites', 'users', 'tenants'];
+  const tables = ['ticket_messages', 'support_tickets', 'payment_events', 'orders', 'application_activities', 'applications', 'platform_audit_logs', 'sms_codes', 'platform_users', 'visitor_tags', 'follow_ups', 'leads', 'form_submissions', 'forms', 'messages', 'conversations', 'events', 'pageviews', 'visitor_sessions', 'recordings', 'visitors', 'faqs', 'faq_categories', 'knowledge_files', 'rules', 'rule_logs', 'canned_replies', 'tags', 'blacklist', 'announcements', 'notifications', 'notification_channels', 'api_keys', 'audit_logs', 'sites', 'users', 'accounts', 'tenants'];
   for (const t of tables) db.exec(`DELETE FROM ${t}`);
   db.exec("DELETE FROM sqlite_sequence");
 }
@@ -110,10 +111,15 @@ function createTenant(name, plan, brand) {
   ).lastInsertRowid;
 }
 
-function createUser(tenantId, email, userName, password, role) {
+function createUser(tenantId, email, userName, password, role, phone) {
+  const hash = hashPassword(password);
+  const accountId = run(
+    'INSERT INTO accounts (phone, email, name, password_hash, signup_source) VALUES (?,?,?,?,?)',
+    [phone || null, email, userName, hash, 'seed']
+  ).lastInsertRowid;
   return run(
-    'INSERT INTO users (tenant_id, email, name, password_hash, role, avatar) VALUES (?,?,?,?,?,?)',
-    [tenantId, email, userName, hashPassword(password), role, userName.slice(0, 1)]
+    'INSERT INTO users (tenant_id, account_id, email, phone, name, password_hash, role, avatar) VALUES (?,?,?,?,?,?,?,?)',
+    [tenantId, accountId, email, phone || null, userName, hash, role, userName.slice(0, 1)]
   ).lastInsertRowid;
 }
 
@@ -141,9 +147,9 @@ function defaultWidget(overrides = {}) {
     showBranding: true,
     businessHours: '09:00-21:00',
     compliance: {
-      enabled: true,
-      text: '我们使用 Cookie 记录访问轨迹以改善服务，您可以选择拒绝行为追踪。',
-      policyUrl: '/privacy.html'
+      enabled: false,
+      text: '',
+      policyUrl: ''
     },
     ...overrides
   };
@@ -155,30 +161,31 @@ clear();
 const t1 = createTenant('云图科技', 'pro', '云图线索客服');
 const t2 = createTenant('星辰跨境', 'standard', '星辰跨境');
 
-const admin = createUser(t1, 'admin@demo.com', '林晓', 'admin123', 'admin');
-const ops = createUser(t1, 'ops@demo.com', '周敏', 'ops123', 'operator');
-const agent1 = createUser(t1, 'agent@demo.com', '陈曦', 'agent123', 'agent');
-const agent2 = createUser(t1, 'agent2@demo.com', '王凯', 'agent123', 'agent');
-const t2admin = createUser(t2, 'owner@demo.com', '苏蔓', 'demo1234', 'admin');
+const admin = createUser(t1, 'admin@demo.com', '林晓', 'admin123', 'admin', '13800000001');
+const ops = createUser(t1, 'ops@demo.com', '周敏', 'ops123', 'operator', '13800000002');
+const agent1 = createUser(t1, 'agent@demo.com', '陈曦', 'agent123', 'agent', '13800000003');
+const agent2 = createUser(t1, 'agent2@demo.com', '王凯', 'agent123', 'agent', '13800000004');
+const t2admin = createUser(t2, 'owner@demo.com', '苏蔓', 'demo1234', 'admin', '13800000005');
 
 const site1 = run(
-  `INSERT INTO sites (tenant_id, name, domain, site_key, widget_config, tracking_enabled, compliance_enabled)
-   VALUES (?,?,?,?,?,1,1)`,
-  [t1, '云图科技官网', 'www.yuntu-tech.com', 'qz_demo_8f3k2m', JSON.stringify(defaultWidget())]
+  `INSERT INTO sites (tenant_id, name, domain, site_key, loader_token, widget_config, tracking_enabled, compliance_enabled)
+   VALUES (?,?,?,?,?,?,1,1)`,
+  [t1, '云图科技官网', 'www.yuntu-tech.com', 'qz_demo_8f3k2m', '0f928e95b1adc3f89d3a1e0dab18c5bf', JSON.stringify(defaultWidget())]
 ).lastInsertRowid;
 
 const site2 = run(
-  `INSERT INTO sites (tenant_id, name, domain, site_key, widget_config, tracking_enabled, compliance_enabled)
-   VALUES (?,?,?,?,?,1,0)`,
-  [t1, '产品帮助中心', 'help.yuntu-tech.com', 'qz_help_2d9x7p', JSON.stringify(defaultWidget({ primaryColor: '#8b5cf6', title: '帮助中心', welcome: '欢迎来到帮助中心，可以先看看常见问题。', prechatEnabled: false }))]
+  `INSERT INTO sites (tenant_id, name, domain, site_key, loader_token, widget_config, tracking_enabled, compliance_enabled)
+   VALUES (?,?,?,?,?,?,1,0)`,
+  [t1, '产品帮助中心', 'help.yuntu-tech.com', 'qz_help_2d9x7p', loaderToken(), JSON.stringify(defaultWidget({ primaryColor: '#8b5cf6', title: '帮助中心', welcome: '欢迎来到帮助中心，可以先看看常见问题。', prechatEnabled: false }))]
 ).lastInsertRowid;
 
 const site3 = run(
-  `INSERT INTO sites (tenant_id, name, domain, site_key, widget_config, tracking_enabled, compliance_enabled)
-   VALUES (?,?,?,?,?,1,1)`,
-  [t2, 'BloomCraft 独立站', 'www.bloomcraft.com', 'qz_bloom_5k1n8', JSON.stringify(defaultWidget({ primaryColor: '#10b981', welcome: 'Hi! How can we help you today?', showBranding: false }))]
+  `INSERT INTO sites (tenant_id, name, domain, site_key, loader_token, widget_config, tracking_enabled, compliance_enabled)
+   VALUES (?,?,?,?,?,?,1,1)`,
+  [t2, 'BloomCraft 独立站', 'www.bloomcraft.com', 'qz_bloom_5k1n8', loaderToken(), JSON.stringify(defaultWidget({ primaryColor: '#10b981', welcome: 'Hi! How can we help you today?', showBranding: false }))]
 ).lastInsertRowid;
 
+run("UPDATE sites SET installed_at = datetime('now','-12 days'), last_widget_ping_at = datetime('now') WHERE id IN (?,?)", [site1, site3]);
 run('UPDATE tenants SET hide_branding = 0 WHERE id = ?', [t1]);
 run('INSERT INTO api_keys (tenant_id, name, key) VALUES (?,?,?)', [t1, '默认 API Key', signApiKey()]);
 
@@ -197,7 +204,7 @@ const FAQS = [
   ['接入与部署', '接入需要技术人员吗？', '复制后台生成的一段 script 标签粘贴到网站 head 或 body 末尾即可，通常 5 分钟完成。'],
   ['接入与部署', '一个账号可以管理多个网站吗？', '可以。多站点各自生成独立 JS，访客、会话、线索和报表按站点隔离统计。'],
   ['接入与部署', '被广告拦截插件拦截怎么办？', '后台会展示挂件拦截率。我们提供独立域名加载脚本与降级入口，可显著降低拦截影响。'],
-  ['售后服务', '数据存储在哪里？是否合规？', '数据按租户隔离存储，支持一键关闭行为采集，并提供隐私提示与拒绝追踪选项。'],
+  ['售后服务', '数据存储在哪里？是否安全？', '数据按租户隔离存储，支持一键关闭行为采集，企业版可提供独立部署与数据导出方案。'],
   ['售后服务', '可以开发票吗？', '支持增值税普通发票与专用发票，付款后在后台提交开票信息即可。'],
   ['售后服务', '如何迁移历史会话？', '企业版提供开放 API 与数据导出接口，可将会话、线索与访客档案迁移到自有系统。']
 ];
@@ -498,6 +505,73 @@ for (const [sid, tid] of [[site2, t1], [site3, t2]]) {
     [tid, sid, 'form', name(), phone(), pick(BUSINESS), '独立站询盘，需要多语言接待。', 'new', 50]);
 }
 
+// 平台运营账号
+const platformAdmin = run('INSERT INTO platform_users (name, email, password_hash, role) VALUES (?,?,?,?)',
+  ['平台运营', 'ops@platform.com', hashPassword('ops123'), 'superadmin']).lastInsertRowid;
+const platformSales = run('INSERT INTO platform_users (name, email, password_hash, role) VALUES (?,?,?,?)',
+  ['销售顾问', 'sales@platform.com', hashPassword('sales123'), 'sales']).lastInsertRowid;
+
+// 自助注册的 C 端工作空间（用于运营后台演示）
+const self1 = createWorkspace({
+  workspaceName: '木棉设计工作室', ownerName: '赵一鸣', phone: '13600000001', email: 'zhaoyiming@example.com',
+  password: 'demo1234', website: 'www.mumian-design.com', plan: 'pro', planStatus: 'trialing',
+  source: 'self_signup', industry: '设计服务', goal: '线索收集', trialDays: 3
+});
+const self2 = createWorkspace({
+  workspaceName: '海纳跨境独立站', ownerName: '苏晴', phone: '13600000002', email: 'suqing@example.com',
+  password: 'demo1234', website: 'www.hainacross.com', plan: 'standard', planStatus: 'active',
+  source: 'sales_convert', industry: '跨境贸易', goal: '客服接待'
+});
+const self3 = createWorkspace({
+  workspaceName: '青柠健身工作室', ownerName: '陈野', phone: '13600000003', email: 'chenye@example.com',
+  password: 'demo1234', website: 'www.qingning-fit.com', plan: 'free', planStatus: 'active',
+  source: 'self_signup', industry: '本地生活', goal: '客服接待'
+});
+// 让演示数据更像真实运营状态
+run("UPDATE sites SET installed_at = datetime('now','-2 days'), last_widget_ping_at = datetime('now') WHERE tenant_id = ? AND is_sandbox = 0", [self1.tenant.id]);
+run("UPDATE sites SET installed_at = datetime('now','-9 days'), last_widget_ping_at = datetime('now') WHERE tenant_id = ? AND is_sandbox = 0", [self2.tenant.id]);
+const sid1 = get('SELECT id FROM sites WHERE tenant_id = ? AND is_sandbox = 0', [self1.tenant.id]).id;
+const v1 = run(`INSERT INTO visitors (tenant_id, site_id, vid, fingerprint, name, phone, province, city, device, browser, os, source, pageview_count, visit_count, total_dwell_ms, intent_score, intent_level, tracking_consent)
+  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`, [self1.tenant.id, sid1, 'v_demo_self_1', 'fp_demo_self_1', '李想', '13711112222', '广东', '深圳', 'desktop', 'Chrome', 'Windows', 'baidu', 5, 2, 260000, 72, 'high']).lastInsertRowid;
+const c1 = run(`INSERT INTO conversations (tenant_id, site_id, visitor_id, status, subject, source, last_message_at) VALUES (?,?,?,?,?,?,datetime('now','-1 day'))`,
+  [self1.tenant.id, sid1, v1, 'open', '想咨询官网留资方案', 'baidu']).lastInsertRowid;
+run("INSERT INTO messages (tenant_id, conversation_id, sender_type, sender_name, type, content, created_at) VALUES (?,?,?,?,?,?,datetime('now','-1 day'))", [self1.tenant.id, c1, 'visitor', '李想', 'text', '你好，想了解一下你们的方案。']);
+run("INSERT INTO leads (tenant_id, site_id, visitor_id, conversation_id, source, name, phone, requirement, status, owner_id, score, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,datetime('now','-1 day'))", [self1.tenant.id, sid1, v1, c1, 'chat', '李想', '13711112222', '想咨询官网留资方案', 'new', self1.user.id, 72]);
+
+// 申请表单用户（B 端销售线索）
+const appRows = [
+  ['周启明', '13500000011', 'zhouqm@haichuan-logistics.com', '海川物流', 'www.haichuan-logistics.com', '20 人以上', '官网留资率低', 'contacted', platformSales, '想了解多站点管理和线索分配。'],
+  ['林一诺', '13500000012', 'linyn@qiming-edu.com', '启明教育', 'www.qiming-edu.com', '6-20 人', '客服人力不足', 'qualified', platformSales, '希望用 AI 先接待再转人工。'],
+  ['许文', '13500000013', 'xuwen@atelier-xu.com', '独立设计工作室', 'www.atelier-xu.com', '1 人', '官网留资率低', 'new', null, '个人网站，想先自己接入。'],
+  ['高远', '13500000014', 'gaoyuan@beichen.com', '北辰咨询', 'www.beichen-consulting.com', '6-20 人', '线索跟进混乱', 'demo', platformAdmin, '已预约下周演示。'],
+  ['苏晴', '13600000002', 'suqing@example.com', '海纳跨境', 'www.hainacross.com', '2-5 人', '外贸多语言接待', 'won', platformSales, '已转为标准版工作空间。']
+];
+for (const [n, p, e, company, site, size, channel, status, ownerId, msg] of appRows) {
+  const appId = run('INSERT INTO applications (name, phone, email, company, website, size, channel, message, source, status, owner_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+    [n, p, e, company, site, size, channel, msg, 'landing', status, ownerId]).lastInsertRowid;
+  run('INSERT INTO application_activities (application_id, platform_user_id, type, content) VALUES (?,?,?,?)', [appId, ownerId, 'note', '首次沟通记录：客户主要关注接入成本与线索转化。']);
+}
+run("UPDATE applications SET tenant_id = ?, account_id = ?, status = 'won' WHERE phone = '13600000002'", [self2.tenant.id, self2.account.id]);
+run('INSERT INTO applications (name, phone, email, company, website, size, channel, message, source, status) VALUES (?,?,?,?,?,?,?,?,?,?)',
+  ['陈野', '13600000003', 'chenye@example.com', '青柠健身工作室', 'www.qingning-fit.com', '1 人', '官网留资率低', '已自助注册，先自己研究。', 'signup', 'contacted']);
+
+// 订阅订单与工单演示数据
+run(`INSERT INTO orders (order_no, tenant_id, plan, cycle, amount_cents, status, provider, invoice_no, paid_at, period_start, period_end, created_by)
+  VALUES (?,?,?,?,?,?,?,?,datetime('now','-9 days'),datetime('now','-9 days'),datetime('now','+21 days'),?)`,
+  ['QZ20261030SEED001', self2.tenant.id, 'standard', 'monthly', 29900, 'paid', 'mock', 'INV-202610-SEED01', self2.user.id]);
+run("UPDATE tenants SET billing_cycle = 'monthly', current_period_start = datetime('now','-9 days'), current_period_end = datetime('now','+21 days'), last_payment_at = datetime('now','-9 days') WHERE id = ?", [self2.tenant.id]);
+run(`INSERT INTO orders (order_no, tenant_id, plan, cycle, amount_cents, status, provider, created_by)
+  VALUES (?,?,?,?,?,?,?,?)`, ['QZ20261030SEED002', self1.tenant.id, 'pro', 'monthly', 89900, 'pending', 'mock', self1.user.id]);
+const t1Ticket = run("INSERT INTO support_tickets (tenant_id, user_id, subject, category, priority, status, last_message_at) VALUES (?,?,?,?,?,?,datetime('now','-2 hours'))", [self1.tenant.id, self1.user.id, '安装 JS 后没有看到挂件', 'install', 'high', 'open']).lastInsertRowid;
+run("INSERT INTO ticket_messages (ticket_id, sender_type, sender_id, sender_name, content, created_at) VALUES (?,?,?,?,?,datetime('now','-2 hours'))", [t1Ticket, 'tenant', self1.user.id, self1.user.name, '我已经把代码放到 body 末尾了，刷新后右下角没有出现客服按钮，网站是 www.mumian-design.com。']);
+const t2Ticket = run("INSERT INTO support_tickets (tenant_id, user_id, subject, category, priority, status, last_message_at) VALUES (?,?,?,?,?,?,datetime('now','-1 day'))", [self2.tenant.id, self2.user.id, '发票抬头需要修改', 'billing', 'normal', 'pending']).lastInsertRowid;
+run("INSERT INTO ticket_messages (ticket_id, sender_type, sender_id, sender_name, content, created_at) VALUES (?,?,?,?,?,datetime('now','-1 day'))", [t2Ticket, 'tenant', self2.user.id, self2.user.name, '麻烦把发票抬头改成「海纳跨境电子商务有限公司」。']);
+run("INSERT INTO ticket_messages (ticket_id, sender_type, sender_id, sender_name, content, created_at) VALUES (?,?,?,?,?,datetime('now','-20 hours'))", [t2Ticket, 'platform', platformSales, '销售顾问', '已登记，下一张发票会使用新的抬头。']);
+const t0Ticket = run("INSERT INTO support_tickets (tenant_id, user_id, subject, category, priority, status, last_message_at) VALUES (?,?,?,?,?,?,datetime('now','-3 days'))", [t1, admin, '如何把访客数据导出成 CSV', 'feature', 'normal', 'resolved']).lastInsertRowid;
+run("INSERT INTO ticket_messages (ticket_id, sender_type, sender_id, sender_name, content, created_at) VALUES (?,?,?,?,?,datetime('now','-3 days'))", [t0Ticket, 'tenant', admin, '林晓', '线索列表可以批量导出吗？']);
+run("INSERT INTO ticket_messages (ticket_id, sender_type, sender_id, sender_name, content, created_at) VALUES (?,?,?,?,?,datetime('now','-2 days'))", [t0Ticket, 'platform', platformAdmin, '平台运营', '专业版支持在线索 CRM 右上角导出 CSV，已为你标记解决。']);
+
+
 run('INSERT INTO audit_logs (tenant_id, user_id, action, target, detail, ip, created_at) VALUES (?,?,?,?,?,?,?)',
   [t1, admin, 'login', 'admin@demo.com', '登录成功', '127.0.0.1', fmt(new Date())]);
 run('INSERT INTO audit_logs (tenant_id, user_id, action, target, detail, ip, created_at) VALUES (?,?,?,?,?,?,?)',
@@ -514,4 +588,6 @@ const counts = {
   events: get('SELECT COUNT(*) c FROM events').c
 };
 console.log('Seed complete:', counts);
-console.log('Accounts: admin@demo.com/admin123, ops@demo.com/ops123, agent@demo.com/agent123, agent2@demo.com/agent123, owner@demo.com/demo1234');
+console.log('Tenant accounts: admin@demo.com/admin123, ops@demo.com/ops123, agent@demo.com/agent123, agent2@demo.com/agent123, owner@demo.com/demo1234');
+console.log('Platform ops: ops@platform.com/ops123 (superadmin), sales@platform.com/sales123 (sales)');
+console.log('Self-serve demo: 13600000001/demo1234 (木棉设计工作室, trialing)');

@@ -24,7 +24,7 @@ function b64(obj) {
 }
 
 function signToken(user) {
-  const payload = { uid: user.id, tid: user.tenant_id, role: user.role, exp: Date.now() + TOKEN_TTL };
+  const payload = { uid: user.id, aid: user.account_id || null, tid: user.tenant_id, role: user.role, realm: 'tenant', exp: Date.now() + TOKEN_TTL };
   const body = b64(payload);
   const sig = crypto.createHmac('sha256', SECRET).update(body).digest('base64url');
   return `${body}.${sig}`;
@@ -52,11 +52,47 @@ function authRequired(req, res, next) {
   if (!payload) return res.status(401).json({ error: '登录已失效，请重新登录', code: 'UNAUTHORIZED' });
   const user = get('SELECT * FROM users WHERE id = ? AND status = ?', [payload.uid, 'active']);
   if (!user) return res.status(401).json({ error: '账号不可用', code: 'UNAUTHORIZED' });
+  const account = user.account_id ? get('SELECT * FROM accounts WHERE id = ?', [user.account_id]) : null;
+  if (account && account.status !== 'active') return res.status(403).json({ error: '登录账号已被停用', code: 'ACCOUNT_DISABLED' });
   const tenant = get('SELECT * FROM tenants WHERE id = ?', [user.tenant_id]);
-  if (!tenant || tenant.status !== 'active') return res.status(403).json({ error: '租户已停用', code: 'TENANT_DISABLED' });
+  if (!tenant || tenant.status !== 'active') return res.status(403).json({ error: '工作空间已停用', code: 'TENANT_DISABLED' });
   req.user = user;
+  req.account = account;
   req.tenant = tenant;
   next();
+}
+
+function signOpsToken(opsUser) {
+  const payload = { pid: opsUser.id, role: opsUser.role, realm: 'ops', exp: Date.now() + TOKEN_TTL };
+  const body = b64(payload);
+  const sig = crypto.createHmac('sha256', SECRET).update(body).digest('base64url');
+  return `${body}.${sig}`;
+}
+
+function readOpsToken(token) {
+  const payload = readToken(token);
+  if (!payload || payload.realm !== 'ops' || !payload.pid) return null;
+  return payload;
+}
+
+function opsAuthRequired(req, res, next) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : (req.query.token || '');
+  const payload = readOpsToken(token);
+  if (!payload) return res.status(401).json({ error: '运营登录已失效', code: 'OPS_UNAUTHORIZED' });
+  const user = get('SELECT * FROM platform_users WHERE id = ? AND status = ?', [payload.pid, 'active']);
+  if (!user) return res.status(401).json({ error: '运营账号不可用', code: 'OPS_UNAUTHORIZED' });
+  req.opsUser = user;
+  next();
+}
+
+function requireOpsRole(...roles) {
+  return (req, res, next) => {
+    if (!req.opsUser || !roles.includes(req.opsUser.role)) {
+      return res.status(403).json({ error: '当前运营角色无权执行该操作', code: 'OPS_FORBIDDEN' });
+    }
+    next();
+  };
 }
 
 function requireRole(...roles) {
@@ -103,5 +139,6 @@ function apiKeyAuth(req, res, next) {
 
 module.exports = {
   hashPassword, verifyPassword, signToken, readToken, authRequired,
-  requireRole, featureGate, signApiKey, apiKeyAuth
+  requireRole, featureGate, signApiKey, apiKeyAuth,
+  signOpsToken, readOpsToken, opsAuthRequired, requireOpsRole
 };

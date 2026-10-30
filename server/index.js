@@ -15,6 +15,12 @@ const configRoutes = require('./routes/config');
 const settingsRoutes = require('./routes/settings');
 const externalRoutes = require('./routes/external');
 const landingRoutes = require('./routes/landing');
+const signupRoutes = require('./routes/signup');
+const onboardingRoutes = require('./routes/onboarding');
+const opsRoutes = require('./routes/ops');
+const paymentRoutes = require('./routes/payments');
+const supportRoutes = require('./routes/support');
+const { startLifecycle } = require('./services/lifecycle');
 const socketInit = require('./socket').init;
 const { UPLOAD_DIR } = require('./upload');
 
@@ -35,25 +41,68 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '2mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // Widget script must be embeddable cross-origin
 app.use('/widget.js', (req, res, next) => {
+  if (!scriptContextAllowed(req)) return res.status(404).type('text').send('Not Found');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cache-Control', 'public, max-age=60');
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   next();
 });
 app.use('/widget-core.js', (req, res, next) => {
+  if (!scriptContextAllowed(req)) return res.status(404).type('text').send('Not Found');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cache-Control', 'public, max-age=300');
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   next();
 });
 
+function scriptContextAllowed(req) {
+  const dest = String(req.headers['sec-fetch-dest'] || '').toLowerCase();
+  if (dest) return dest === 'script';
+  return Boolean(req.headers.referer);
+}
+
+app.get('/qz.js', (req, res) => {
+  if (!scriptContextAllowed(req)) return res.status(404).type('text').send('Not Found');
+  const token = decodeURIComponent(String(req.originalUrl.split('?')[1] || '').split('&')[0]).trim();
+  if (!/^[a-f0-9]{32}$/.test(token)) return res.status(404).type('text').send('Not Found');
+  const site = require('./db').get('SELECT s.*, t.status AS tenant_status FROM sites s JOIN tenants t ON t.id = s.tenant_id WHERE s.loader_token = ?', [token]);
+  if (!site || site.tenant_status !== 'active' || site.blocked) return res.status(404).type('text').send('Not Found');
+  const template = fs.readFileSync(path.join(PUBLIC_DIR, 'widget.js'), 'utf8');
+  const body = template.replace('__SITE_KEY__', String(site.site_key).replace(/[^a-zA-Z0-9_]/g, ''));
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'public, max-age=300');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.type('application/javascript').send(body);
+});
+
+app.get('/qz-core.js', (req, res) => {
+  if (!scriptContextAllowed(req)) return res.status(404).type('text').send('Not Found');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'public, max-age=300');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.type('application/javascript').sendFile(path.join(PUBLIC_DIR, 'widget-core.js'));
+});
+
+app.use('/api/public', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  next();
+});
 app.use('/api/public', publicRoutes);
 app.use('/api/public', landingRoutes);
+app.use('/api/signup', signupRoutes);
+app.use('/api/onboarding', onboardingRoutes);
+app.use('/api/support', supportRoutes);
+app.use('/api/ops', opsRoutes);
+app.use('/api/public/payments', paymentRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api', landingRoutes);
 app.use('/api/v1', externalRoutes);
@@ -68,8 +117,9 @@ app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d', fallthrough: true
 app.use(express.static(PUBLIC_DIR, { index: false, maxAge: 0, etag: true }));
 
 app.get(['/demo', '/demo/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'demo', 'index.html')));
-
+app.get(['/signup', '/signup/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'signup', 'index.html')));
 app.get(['/admin', '/admin/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin', 'index.html')));
+app.get(['/ops', '/ops/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'ops', 'index.html')));
 app.use('/admin', express.static(path.join(PUBLIC_DIR, 'admin'), { index: 'index.html', maxAge: 0 }));
 app.get('/admin/*', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin', 'index.html')));
 
@@ -99,12 +149,14 @@ const io = new Server(server, {
 
 socketInit(io);
 
+startLifecycle();
+
 server.listen(PORT, HOST, () => {
   console.log(`[qingzhan] server running at http://${HOST}:${PORT}`);
   console.log(`[qingzhan] landing:  http://localhost:${PORT}/`);
   console.log(`[qingzhan] admin:    http://localhost:${PORT}/admin/`);
   console.log(`[qingzhan] demo:     http://localhost:${PORT}/demo/`);
-  console.log(`[qingzhan] widget:   http://localhost:${PORT}/widget.js?key=qz_demo_8f3k2m`);
+  console.log(`[qingzhan] widget:   http://localhost:${PORT}/qz.js?0f928e95b1adc3f89d3a1e0dab18c5bf`);
 });
 
 function shutdown() {

@@ -170,8 +170,8 @@ function sanitizeWidget(site, plan) {
     languages: licensed.translation ? (w.languages || ['zh-CN', 'en-US']) : ['zh-CN'],
     compliance: {
       enabled: !!site.compliance_enabled,
-      text: (w.compliance && w.compliance.text) || '我们使用 Cookie 记录访问轨迹以改善服务，您可以选择拒绝。',
-      policyUrl: (w.compliance && w.compliance.policyUrl) || '',
+      text: '',
+      policyUrl: '',
       required: !!(w.compliance && w.compliance.required)
     },
     licensed,
@@ -186,6 +186,11 @@ router.get('/config', async (req, res) => {
   if (site.blocked || site.tenant_status !== 'active') return res.status(403).json({ error: '站点已停用' });
   const plan = site.tenant_plan;
   const ip = clientIp(req);
+  if (site.is_sandbox) {
+    run("UPDATE sites SET last_widget_ping_at = datetime('now') WHERE id = ?", [site.id]);
+  } else {
+    run("UPDATE sites SET installed_at = COALESCE(installed_at, datetime('now')), last_widget_ping_at = datetime('now') WHERE id = ?", [site.id]);
+  }
   const visitor = req.query.vid
     ? get('SELECT * FROM visitors WHERE tenant_id = ? AND site_id = ? AND vid = ?', [site.tenant_id, site.id, req.query.vid])
     : null;

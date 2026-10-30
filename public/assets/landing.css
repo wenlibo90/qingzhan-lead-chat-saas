@@ -186,10 +186,6 @@ a { color: inherit; text-decoration: none; }
 .rec-demo span:last-child { margin-left: auto; color: var(--muted); font-family: inherit; }
 .rec-dot { width: 7px; height: 7px; border-radius: 50%; background: #ef4444; animation: blink 1.2s infinite; }
 @keyframes blink { 50% { opacity: .3; } }
-.compliance-demo { margin-top: 18px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 10px; color: var(--muted); line-height: 1.6; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
-.compliance-demo span { flex: 1 1 100%; }
-.compliance-demo button { border: none; background: #2563eb; color: #fff; border-radius: 5px; padding: 4px 8px; font-size: 9.5px; cursor: default; }
-.compliance-demo button.ghost { background: transparent; color: var(--muted); }
 .blocked-demo { margin-top: 18px; display: flex; flex-direction: column; gap: 3px; }
 .blocked-demo b { font-size: 25px; letter-spacing: -.04em; color: #b45309; }
 .blocked-demo span { font-size: 10.5px; color: var(--muted); }
@@ -380,4 +376,21 @@ a { color: inherit; text-decoration: none; }
   .footer-grid { grid-template-columns: 1fr 1fr; }
   .nav-actions .btn-ghost { display: none; }
   .site-nav { background: rgba(255, 255, 255, .86); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(148, 163, 184, .16); }
+}
+
+/* two-line entry */
+.path-section { padding-top: 20px; }
+.path-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.path-card { position: relative; background: rgba(255,255,255,.78); border: 1px solid var(--line); border-radius: 22px; padding: 28px; box-shadow: 0 16px 40px rgba(15,23,42,.05); }
+.path-card.path-team { background: linear-gradient(160deg, rgba(37,99,235,.07), rgba(255,255,255,.9)); border-color: rgba(37,99,235,.28); }
+.path-tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .06em; color: #1d4ed8; background: rgba(37,99,235,.08); border-radius: 999px; padding: 5px 10px; }
+.path-card h3 { font-size: 21px; letter-spacing: -.03em; margin: 14px 0 8px; }
+.path-card p { font-size: 12.5px; line-height: 1.85; color: var(--muted); margin: 0 0 16px; }
+.path-card ul { list-style: none; padding: 0; margin: 0 0 20px; display: flex; flex-direction: column; gap: 7px; }
+.path-card li { font-size: 11px; color: #475569; display: flex; gap: 6px; }
+.path-card li::before { content: "✓"; color: #10b981; font-weight: 800; }
+.path-card .btn { min-width: 150px; }
+@media (max-width: 760px) {
+  .path-grid { grid-template-columns: 1fr; }
+  .path-card { padding: 22px; }
 }

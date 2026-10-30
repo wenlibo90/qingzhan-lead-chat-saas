@@ -24,7 +24,7 @@
 
   // ---------------- widget ----------------
   A.registerPage('widget', {
-    title: '挂件配置', subtitle: '外观、文案、能力开关与合规',
+    title: '挂件配置', subtitle: '外观、文案与能力开关',
     roles: ['admin', 'operator'],
     feature: 'widget_basic',
     render: function (root) {
@@ -32,10 +32,9 @@
       if (!D.widget) D.widget = { tab: 'appearance' };
       var st = D.widget;
       var site = A.currentSite();
-      var tabs = [{ k: 'appearance', label: '外观与文案' }, { k: 'features', label: '功能与合规' }, { k: 'announcement', label: '公告悬浮条' }, { k: 'blacklist', label: '访客黑名单' }, { k: 'embed', label: '接入代码' }];
+      var tabs = [{ k: 'appearance', label: '外观与文案' }, { k: 'features', label: '能力开关' }, { k: 'announcement', label: '公告悬浮条' }, { k: 'blacklist', label: '访客黑名单' }, { k: 'embed', label: '接入代码' }];
       root.innerHTML = '<div class="page-head"><div><h1>挂件配置</h1><p>当前站点：' + A.esc(site.name) + ' · 修改后保存即刻对线上挂件生效</p></div>' +
-        '<div class="head-actions"><a class="au-btn au-btn--ghost au-btn--sm" href="/demo/" target="_blank">' + A.icon('external', 14) + ' 打开演示站</a>' +
-        '<button class="au-btn au-btn--primary au-btn--sm" data-save-widget>保存配置</button></div></div>' +
+        '<div class="head-actions"><button class="au-btn au-btn--primary au-btn--sm" data-save-widget>保存配置</button></div></div>' +
         '<div class="az-card mb-2"><div class="az-card-body tight" style="padding-bottom:0"><div class="tabs">' + tabs.map(function (t) {
           var locked = (t.k === 'announcement' && !A.can('announcement')) || (t.k === 'blacklist' && !A.can('blacklist'));
           return '<button class="' + (st.tab === t.k ? 'active' : '') + (locked ? ' locked' : '') + '" data-wtab="' + t.k + '">' + t.label + (locked ? ' · 专业版' : '') + '</button>';
@@ -165,12 +164,8 @@
         switchRow('AI 接待机器人', '基于知识库自动应答，无法回答转人工', 'aiEnabled', !!cfg.aiEnabled, A.can('ai_bot')) +
         switchRow('显示平台标识', '关闭后隐藏 Powered by，企业版白标', 'showBranding', cfg.showBranding !== false, true) +
         '</div></div>' +
-        '<div class="az-card"><div class="az-card-head"><h3>追踪与合规</h3><div class="sub">个人信息保护相关配置</div></div><div class="az-card-body">' +
+        '<div class="az-card"><div class="az-card-head"><h3>行为采集</h3><div class="sub">访客轨迹与来源统计</div></div><div class="az-card-body">' +
         switchRow('行为采集总开关', '关闭后不再记录页面轨迹、点击与来源（会话仍可用）', 'tracking', !!site.tracking_enabled, true) +
-        switchRow('隐私提示弹窗', '首次访问展示追踪说明，允许访客拒绝', 'compliance_enabled', !!site.compliance_enabled, true) +
-        '<div class="mt-1"><label class="field-label">隐私提示文案</label><textarea class="az-textarea" data-comp="text">' + A.esc((cfg.compliance && cfg.compliance.text) || '') + '</textarea></div>' +
-        '<div class="mt-1"><label class="field-label">隐私政策链接</label><input class="az-input" data-comp="policyUrl" value="' + A.esc((cfg.compliance && cfg.compliance.policyUrl) || '') + '" placeholder="https://your-site.com/privacy"></div>' +
-        '<div class="mt-1">' + switchRow('必须同意后才能对话', '开启后拒绝追踪的访客仍可聊天，但不会记录轨迹', 'compliance_required', !!(cfg.compliance && cfg.compliance.required), true) + '</div>' +
         '<div class="notice info mt-1">' + A.icon('shield', 14) + '<span>关闭行为采集总开关会立即生效，后台报表将停止新增轨迹数据。</span></div>' +
         '</div></div></div>' +
         '<div class="grid" style="gap:16px;align-content:start">' + previewHtml(cfg) + '<div class="az-card pad"><h4 style="margin:0 0 8px;font-size:13px">配置提示</h4><div class="tiny muted" style="line-height:1.8">· 预检表单只在首次咨询时出现，提交后写入线索<br>· 知识库内容在「知识库」页面维护<br>· AI 机器人使用同一个知识库，未命中自动转人工<br>· 移动端可单独调整按钮尺寸与位置</div></div></div></div>';
@@ -178,12 +173,6 @@
       bindPreview(root);
       A.$$('[data-f]', box).forEach(function (i) {
         i.addEventListener('change', function () { D.widget.cfg[i.getAttribute('data-f')] = i.value; });
-      });
-      A.$$('[data-comp]', box).forEach(function (i) {
-        i.addEventListener('input', function () {
-          D.widget.cfg.compliance = D.widget.cfg.compliance || {};
-          D.widget.cfg.compliance[i.getAttribute('data-comp')] = i.value;
-        });
       });
     }).catch(function () {
       box.innerHTML = A.empty('加载失败');
@@ -200,19 +189,12 @@
     var cfg = D.widget.cfg || site.widget_config || {};
     var payload = { widget_config: cfg };
     var tracking = root.querySelector('[data-sw="tracking"]');
-    var compliance = root.querySelector('[data-sw="compliance_enabled"]');
     if (tracking) payload.tracking_enabled = tracking.classList.contains('on');
-    if (compliance) payload.compliance_enabled = compliance.classList.contains('on');
     A.$$('[data-sw]', root).forEach(function (sw) {
       var key = sw.getAttribute('data-sw');
       var on = sw.classList.contains('on');
-      if (key === 'tracking' || key === 'compliance_enabled') return;
-      if (key === 'compliance_required') cfg.compliance = Object.assign(cfg.compliance || {}, { required: on });
-      else cfg[key] = on;
-    });
-    A.$$('[data-comp]', root).forEach(function (i) {
-      cfg.compliance = cfg.compliance || {};
-      cfg.compliance[i.getAttribute('data-comp')] = i.value;
+      if (key === 'tracking') return;
+      cfg[key] = on;
     });
     payload.widget_config = cfg;
     A.apiPatch('/api/sites/' + site.id, payload).then(function (res) {
@@ -345,7 +327,7 @@
             '<span class="pill ' + (String(s.id) === String(A.state.siteId) ? 'blue' : 'gray') + '">' + (String(s.id) === String(A.state.siteId) ? '当前站点' : '切换') + '</span></div>' +
             '<div class="az-card-body"><div class="grid g4" style="gap:8px"><div><div class="tiny muted">访客</div><b>' + s.stats.visitors + '</b></div><div><div class="tiny muted">会话</div><b>' + s.stats.conversations + '</b></div><div><div class="tiny muted">线索</div><b>' + s.stats.leads + '</b></div><div><div class="tiny muted">拦截</div><b>' + s.stats.blockedEvents + '</b></div></div>' +
             '<div class="code-box mt-2" style="font-size:10px;padding:10px 12px">' + A.esc(s.embed_code) + '</div>' +
-            '<div class="flex gap-1 mt-2 wrap"><button class="au-btn au-btn--primary au-btn--xs" data-copy="' + s.id + '">复制代码</button><button class="au-btn au-btn--ghost au-btn--xs" data-use="' + s.id + '">设为当前</button><button class="au-btn au-btn--ghost au-btn--xs" data-edit-site="' + s.id + '">编辑</button><button class="au-btn au-btn--ghost au-btn--xs" data-widget="' + s.id + '">挂件配置</button></div>' +
+            '<div class="flex gap-1 mt-2 wrap"><button class="au-btn au-btn--primary au-btn--xs" data-copy="' + s.id + '">复制代码</button><button class="au-btn au-btn--ghost au-btn--xs" data-use="' + s.id + '">设为当前</button>' + '<button class="au-btn au-btn--ghost au-btn--xs" data-edit-site="' + s.id + '">编辑</button><button class="au-btn au-btn--ghost au-btn--xs" data-widget="' + s.id + '">挂件配置</button></div>' +
             '<div class="tiny muted mt-1">Site Key：<span class="mono">' + A.esc(s.site_key) + '</span></div></div></div>';
         }).join('');
         A.$$('[data-copy]', grid).forEach(function (b) {
@@ -393,7 +375,11 @@
         var body = {};
         A.$$('[data-s]', card).forEach(function (i) { body[i.getAttribute('data-s')] = i.value.trim(); });
         if (!body.name) return A.toast('请填写站点名称', 'err');
-        A.apiPost('/api/sites', body).then(function () { close(); A.toast('站点已创建', 'ok'); A.boot(); }).catch(A.handleError);
+        var wasEmpty = A.state.sites.length === 0;
+        A.apiPost('/api/sites', body).then(function () {
+          close(); A.toast('站点已创建', 'ok'); A.boot();
+          if (wasEmpty) setTimeout(function () { A.go('onboarding'); }, 500);
+        }).catch(A.handleError);
       } }]
     });
   }

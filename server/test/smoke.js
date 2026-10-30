@@ -1,7 +1,9 @@
 'use strict';
 const assert = require('node:assert');
 const { io } = require('socket.io-client');
-const { get } = require('../db');
+const { get, run } = require('../db');
+const { expireTrials, runLifecycle } = require('../services/lifecycle');
+const crypto = require('node:crypto');
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000';
 const KEY = 'qz_demo_8f3k2m';
@@ -48,13 +50,29 @@ function once(socket, event) {
   const token = login.data.token;
   const me = await req('/api/auth/me', { token });
   ok('当前用户与套餐', me.status === 200 && me.data.plan.code === 'pro', me.data.plan);
-  ok('站点列表生成嵌入代码', me.data.sites.length >= 2 && me.data.sites[0].embed_code.includes('widget.js'));
+  ok('站点列表生成绝对嵌入代码', me.data.sites.length >= 2 && /^<script async src="https?:\/\/[^"]+\/qz\.js\?[a-f0-9]{32}"/.test(me.data.sites[0].embed_code), me.data.sites[0].embed_code);
+  const forwardedMe = await req('/api/auth/me', { token, headers: { 'x-forwarded-proto': 'http', 'x-forwarded-host': 'chat.example.com', referer: 'https://chat.example.com/admin/' } });
+  ok('反向代理后自动切换 HTTPS 公开地址', /^<script async src="https:\/\/chat\.example\.com\/qz\.js\?[a-f0-9]{32}"/.test(forwardedMe.data.sites[0].embed_code), forwardedMe.data.sites[0].embed_code);
   const badLogin = await req('/api/auth/login', { body: { email: 'admin@demo.com', password: 'wrong' } });
   ok('错误密码被拒绝', badLogin.status === 401);
+  const opsOnAdmin = await req('/api/auth/login', { body: { email: 'ops@platform.com', password: 'ops123' } });
+  ok('运营账号在客户入口得到正确指引', opsOnAdmin.status === 403 && opsOnAdmin.data.code === 'OPS_ACCOUNT' && opsOnAdmin.data.login_url === '/ops/', opsOnAdmin.data);
+  const adminOnOps = await req('/api/ops/auth/login', { body: { email: 'admin@demo.com', password: 'admin123' } });
+  ok('客户账号在运营入口得到正确指引', adminOnOps.status === 403 && adminOnOps.data.code === 'TENANT_ACCOUNT' && adminOnOps.data.login_url === '/admin/', adminOnOps.data);
 
   console.log('\n[2] 公开配置与访客追踪');
   const cfg = await req('/api/public/config?key=' + KEY);
   ok('挂件配置加载', cfg.status === 200 && cfg.data.widget.primaryColor);
+  const demoToken = get('SELECT loader_token FROM sites WHERE site_key = ?', [KEY]).loader_token;
+  const loaderDirect = await fetch(BASE + '/qz.js?' + demoToken);
+  ok('加载器禁止直接打开', loaderDirect.status === 404);
+  const loaderScript = await fetch(BASE + '/qz.js?' + demoToken, { headers: { 'sec-fetch-dest': 'script' } });
+  const loaderText = await loaderScript.text();
+  ok('加载器按令牌注入且仅保留版权头', loaderScript.status === 200 && loaderText.startsWith('/*! Qingzhan Lead Chat Widget loader v1.0 */') && !/\n\s*\/\//.test(loaderText) && !loaderText.includes('/widget.js'), loaderText.slice(0, 120));
+  const coreDirect = await fetch(BASE + '/qz-core.js');
+  ok('内核脚本禁止直接打开', coreDirect.status === 404);
+  const corsRes = await fetch(BASE + '/api/public/config?key=' + KEY, { headers: { Origin: 'https://customer.example' } });
+  ok('公开 API 支持跨域访问', corsRes.status === 200 && corsRes.headers.get('access-control-allow-origin') === '*');
   ok('专业版返回触发规则', Array.isArray(cfg.data.triggers) && cfg.data.triggers.length >= 3, cfg.data.triggers && cfg.data.triggers.length);
   ok('知识库与表单返回', cfg.data.faqs.length > 0 && cfg.data.forms.all.length > 0);
   const session = await req('/api/public/session', { body: { key: KEY, url: BASE + '/pricing', referrer: 'https://www.baidu.com/s?wd=在线客服系统' } });
@@ -69,10 +87,6 @@ function once(socket, event) {
   ok('点击行为上报', click.status === 200);
   const trigger = await req('/api/public/trigger-check', { body: { key: KEY, vid, url: BASE + '/pricing', dwell: 20, scrollDepth: 10 } });
   ok('触发规则命中价格页停留', trigger.status === 200 && trigger.data.matched && trigger.data.matched.name.includes('价格页'), trigger.data);
-  const consent = await req('/api/public/consent', { body: { key: KEY, vid, consent: false } });
-  ok('访客拒绝追踪接口', consent.status === 200 && consent.data.tracking === false);
-  const consentBack = await req('/api/public/consent', { body: { key: KEY, vid, consent: true } });
-  ok('访客恢复追踪', consentBack.status === 200 && consentBack.data.tracking === true);
   const blocked = await req('/api/public/blacklist-check', { body: { key: KEY, vid: 'v_not_blocked' } });
   ok('黑名单检查接口', blocked.status === 200 && typeof blocked.data.blocked === 'boolean');
 
@@ -243,6 +257,94 @@ function once(socket, event) {
   ok('广告拦截事件上报', adblock.status === 200 && adblock.data.recorded);
   const adEvents = get("SELECT COUNT(*) c FROM events WHERE type = 'adblock'");
   ok('拦截事件已入库', adEvents.c > 0);
+
+  console.log('\n[12] 自助注册与平台运营');
+  const signupPhone = '139' + String(Date.now()).slice(-8);
+  const sendCode = await req('/api/signup/send-code', { body: { phone: signupPhone } });
+  ok('注册验证码发送', sendCode.status === 200 && sendCode.data.dev_code, sendCode.data);
+  const reg = await req('/api/signup/register', { body: {
+    phone: signupPhone, code: sendCode.data.dev_code, password: 'test1234', name: '测试站长',
+    workspaceName: '测试独立站', website: 'www.test-indie.com', industry: '个人博客', goal: '线索收集'
+  } });
+  ok('自助注册创建账号与工作空间', reg.status === 200 && reg.data.token && reg.data.tenant.plan === 'pro', reg.data);
+  const newToken = reg.data.token;
+  const newMe = await req('/api/auth/me', { token: newToken });
+  ok('注册只创建账号与工作空间', newMe.status === 200 && newMe.data.sites.length === 0 && newMe.data.trial.status === 'trialing', newMe.data.sites);
+  const onb0 = await req('/api/onboarding/status', { token: newToken });
+  ok('接入向导提示先添加网站', onb0.status === 200 && onb0.data.steps.length === 5 && onb0.data.steps[0].key === 'site' && !onb0.data.steps[0].done, onb0.data);
+  const newSite = await req('/api/sites', { token: newToken, body: { name: '测试独立站', domain: 'www.test-indie.com' } });
+  ok('后台添加自己的网站', newSite.status === 200 && newSite.data.site.site_key, newSite.data.site);
+  const prodKey = newSite.data.site.site_key;
+  await req('/api/public/config?key=' + prodKey);
+  const onb1 = await req('/api/onboarding/status', { token: newToken });
+  ok('挂件请求后自动检测安装', onb1.data.production_site.installed_at, onb1.data.production_site);
+  const trialTenantId = reg.data.tenant.id;
+  run("UPDATE tenants SET trial_ends_at = datetime('now','-1 minute') WHERE id = ?", [trialTenantId]);
+  expireTrials();
+  const expiredTenant = get('SELECT plan, plan_status FROM tenants WHERE id = ?', [trialTenantId]);
+  ok('试用到期自动降级免费版', expiredTenant.plan === 'free' && expiredTenant.plan_status === 'expired', expiredTenant);
+
+  const opsLogin = await req('/api/ops/auth/login', { body: { email: 'ops@platform.com', password: 'ops123' } });
+  ok('平台运营登录', opsLogin.status === 200 && opsLogin.data.token && opsLogin.data.user.role === 'superadmin');
+  const opsToken = opsLogin.data.token;
+  const opsUnauthorized = await req('/api/ops/overview');
+  ok('运营接口拒绝客户/匿名 Token', opsUnauthorized.status === 401);
+  const ov = await req('/api/ops/overview', { token: opsToken });
+  ok('运营概览含双线指标', ov.status === 200 && ov.data.metrics.accounts > 0 && ov.data.activation.length === 5, ov.data.metrics);
+  const opsAccounts = await req('/api/ops/accounts?q=' + signupPhone, { token: opsToken });
+  ok('运营可按手机号检索注册账号', opsAccounts.status === 200 && opsAccounts.data.accounts.length === 1, opsAccounts.data);
+  const opsApps = await req('/api/ops/applications', { token: opsToken });
+  ok('申请表单进入平台线索池', opsApps.status === 200 && opsApps.data.total > 0 && opsApps.data.statuses.includes('new'), opsApps.data.stats);
+
+  const inviteEmail = 'invite' + Date.now() + '@test.com';
+  const invite = await req('/api/users', { token, body: { name: '邀请客服', email: inviteEmail, password: 'invite123', role: 'agent' } });
+  ok('后台邀请成员创建账号', invite.status === 200);
+  const invitedLogin = await req('/api/auth/login', { body: { email: inviteEmail, password: 'invite123' } });
+  ok('被邀请成员可登录', invitedLogin.status === 200 && invitedLogin.data.user.role === 'agent', invitedLogin.data);
+
+  const leadPhone = '138' + String(Date.now()).slice(-8);
+  const leadApp = await req('/api/public/demo-request', { body: { name: '转化测试', phone: leadPhone, company: '转化测试公司', channel: '官网留资率低' } });
+  const appList = await req('/api/ops/applications?q=' + leadPhone, { token: opsToken });
+  const appId = appList.data.applications[0] && appList.data.applications[0].id;
+  const conv = appId ? await req('/api/ops/applications/' + appId + '/convert', { token: opsToken, body: { workspaceName: '转化测试工作空间', plan: 'free' } }) : { status: 0 };
+  ok('申请可转为工作空间并返回登录信息', conv.status === 200 && conv.data.tenant && conv.data.temp_password, conv.data);
+
+  console.log('\n[13] 订阅订单、支付回调与支持工单');
+  const order = await req('/api/billing/orders', { token: newToken, body: { plan: 'standard', cycle: 'monthly' } });
+  ok('创建订阅订单并服务端计价', order.status === 200 && order.data.order.amount_cents === 29900 && order.data.order.status === 'pending', order.data);
+  const paid = await req('/api/billing/orders/' + order.data.order.id + '/pay', { token: newToken, body: {} });
+  ok('模拟支付开通标准版', paid.status === 200 && paid.data.subscription.plan === 'standard' && paid.data.subscription.plan_status === 'active', paid.data);
+  const bill = await req('/api/billing', { token: newToken });
+  ok('订单与发票可查询', bill.status === 200 && bill.data.orders.some((o) => o.status === 'paid') && bill.data.invoices.length >= 1, bill.data.invoices);
+  const order2 = await req('/api/billing/orders', { token: newToken, body: { plan: 'pro', cycle: 'yearly' } });
+  const eventId = 'evt_test_' + Date.now();
+  const whBody = JSON.stringify({ event_id: eventId, order_no: order2.data.order.order_no, amount_cents: 899000, status: 'paid', provider_trade_no: 'MOCK-WEBHOOK-1' });
+  const whSig = crypto.createHmac('sha256', process.env.PAYMENT_WEBHOOK_SECRET || process.env.APP_SECRET || 'qingzhan-leadchat-dev-secret-2026').update(whBody).digest('hex');
+  const wh = await fetch(BASE + '/api/public/payments/webhook/mock', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-payment-signature': whSig }, body: whBody });
+  const whData = await wh.json();
+  ok('支付回调验签并开通专业版', wh.status === 200 && whData.ok && !whData.failed, whData);
+  const whDup = await fetch(BASE + '/api/public/payments/webhook/mock', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-payment-signature': whSig }, body: whBody });
+  const whDupData = await whDup.json();
+  ok('支付回调幂等', whDupData.duplicate === true, whDupData);
+  const badWh = await fetch(BASE + '/api/public/payments/webhook/mock', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-payment-signature': 'bad' }, body: whBody });
+  ok('错误签名被拒绝', badWh.status === 401);
+  const afterWh = await req('/api/billing', { token: newToken });
+  ok('回调后订阅为专业版年付', afterWh.data.subscription.plan === 'pro' && afterWh.data.subscription.billing_cycle === 'yearly', afterWh.data.subscription);
+
+  const ticket = await req('/api/support/tickets', { token: newToken, body: { subject: '接入检测不生效', content: '已经安装代码但没有检测到，请帮忙看一下。', category: 'install', priority: 'high' } });
+  ok('客户提交支持工单', ticket.status === 200 && ticket.data.id);
+  const opsTicket = await req('/api/ops/tickets/' + ticket.data.id, { token: opsToken });
+  ok('运营可查看工单与消息', opsTicket.status === 200 && opsTicket.data.messages.length >= 1, opsTicket.data.ticket);
+  const opsReply = await req('/api/ops/tickets/' + ticket.data.id + '/messages', { token: opsToken, body: { content: '已收到，请把网站地址发给我们。' } });
+  ok('运营回复工单', opsReply.status === 200);
+  const ticketAfter = await req('/api/support/tickets/' + ticket.data.id, { token: newToken });
+  ok('客户收到运营回复', ticketAfter.data.messages.length >= 2 && ticketAfter.data.ticket.status === 'pending', ticketAfter.data.ticket);
+
+  runLifecycle();
+  const pqlCount = get("SELECT COUNT(*) c FROM applications WHERE source = 'pql'");
+  ok('PQL 自动生成销售线索', pqlCount.c >= 1, pqlCount);
+  const opsSubs = await req('/api/ops/subscriptions', { token: opsToken });
+  ok('运营订阅页含收入与订单', opsSubs.status === 200 && opsSubs.data.revenue > 0 && opsSubs.data.orders.length >= 1, { revenue: opsSubs.data.revenue, orders: opsSubs.data.orders.length });
 
   console.log('\n完成：' + passed + ' 项通过' + (process.exitCode ? '，存在失败项' : '，全部通过'));
   process.exit(process.exitCode || 0);

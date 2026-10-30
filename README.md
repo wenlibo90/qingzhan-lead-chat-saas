@@ -2,10 +2,23 @@
 
 一段 JS 嵌入，客服 + 访客行为埋点 + 营销触达 + 轻线索 CRM 一体化。
 
-- 访客挂件：右下角客服、实时聊天、主动触发、知识库、录屏、公告、合规、广告拦截检测
-- 管理后台：会话接待、访客 360 档案、线索 CRM、报表、自动化、知识库、站点/挂件配置、RBAC、套餐
-- 对外落地页：产品介绍、套餐价格、接入教程、案例、试用申请
-- 数据隔离：所有业务表按 `tenant_id` 隔离，站点维度再按 `site_id` 隔离
+- 访客挂件：右下角客服、实时聊天、主动触发、知识库、录屏、公告、广告拦截检测
+- 客户管理后台：会话接待、访客 360 档案、线索 CRM、报表、自动化、知识库、站点/挂件配置、团队权限、套餐与工单
+- 对外落地页：产品介绍、套餐价格、接入教程、案例、自助注册与团队演示申请
+- 平台运营后台：注册账号、工作空间、试用/订阅、订单收入、申请线索、支持工单、风控、平台成员与操作审计
+- 双线增长：个人站长自助注册 + 团队/企业销售申请，共用一套挂件与业务引擎
+- 自助订阅：订单、月付/年付、模拟支付、支付回调验签、幂等开通、发票记录与到期降级
+- 增长闭环：PQL 自动识别高意向工作空间并进入销售线索池；客户可在后台提交支持工单
+- 数据隔离：所有业务表按 `tenant_id` 隔离，站点维度再按 `site_id` 隔离；平台运营数据独立于客户后台
+
+## 两种客户路径
+
+| 路径 | 适合对象 | 入口 | 开通方式 | 后续运营 |
+| --- | --- | --- | --- | --- |
+| 自助注册 | 个人站长、独立开发者、小项目 | `/signup/` | 手机号验证码 → 账号与工作空间 → 14 天专业版试用 | 后台添加网站、接入向导、自助订阅、帮助工单 |
+| 销售开通 | 团队、企业、外贸独立站 | 落地页团队表单 | 申请进入平台线索池 → 销售跟进 → 转为工作空间 | 演示、报价、合同、客户成功 |
+
+两条线共用同一套挂件、会话、访客分析、线索 CRM 和套餐权限，差异放在获客方式、开通流程和支持方式上。
 
 ## 快速启动
 
@@ -24,28 +37,82 @@ npm start
 
 - 产品官网：`http://localhost:3000`
 - 管理后台：`http://localhost:3000/admin/`
+- 自助注册：`http://localhost:3000/signup/`
+- 平台运营后台：`http://localhost:3000/ops/`
 - 演示宿主站：`http://localhost:3000/demo/`
-- 挂件脚本：`http://localhost:3000/widget.js?key=qz_demo_8f3k2m`
+- 挂件脚本：`http://localhost:3000/qz.js?0f928e95b1adc3f89d3a1e0dab18c5bf`
 
 ## 演示账号
 
-| 角色 | 邮箱 | 密码 | 租户 |
+| 角色 | 登录名 | 密码 | 租户 |
 | --- | --- | --- | --- |
 | 管理员 | admin@demo.com | admin123 | 云图科技（专业版） |
 | 运营 | ops@demo.com | ops123 | 云图科技 |
 | 客服 | agent@demo.com | agent123 | 云图科技 |
 | 客服 | agent2@demo.com | agent123 | 云图科技 |
 | 管理员 | owner@demo.com | demo1234 | 星辰跨境（标准版） |
+| 平台超级管理员 | ops@platform.com | ops123 | 平台运营后台（含工单、订单） |
+| 平台销售 | sales@platform.com | sales123 | 平台运营后台 |
+| 自助注册演示 | 13600000001 | demo1234 | 木棉设计工作室（试用中） |
 
-用第二组账号可以验证租户隔离与标准版功能锁定。
+使用 `owner@demo.com` 可以验证租户隔离与标准版功能锁定；`/ops/` 账号独立于客户账号体系。
+
+## 平台运营后台
+
+访问 `/ops/`，平台运营账号独立于客户账号体系，使用单独的 Token 域和 RBAC。
+
+- 运营概览：注册账号、工作空间、试用、安装、激活漏斗、收入、申请和风险指标。
+- 客户账号：手机号/邮箱检索、关联工作空间、风险分、停用与恢复。
+- 工作空间：套餐、试用、订阅周期、成员、站点、安装状态与用量。
+- 申请线索：落地页申请、手动录入、销售分配、跟进时间线、转工作空间。
+- 订阅与试用：套餐分布、已收金额、订单记录、3 天内到期与最近订阅变化。
+- 支持工单：客户工单列表、优先级、状态、回复与关闭。
+- 风控审核：高风险账号、停用工作空间、同 IP 批量注册。
+- 平台成员：superadmin / ops / sales / support / finance 角色管理。
+- 操作日志：登录、账号、套餐、申请、订单、工单等平台级审计。
+
+客户后台与平台运营后台的数据域隔离：客户只能看到自己的工作空间、订单和工单，看不到平台销售线索与其他客户数据；平台运营账号也不能直接使用客户接口。
+
+## 账号与数据模型
+
+- `accounts`：登录身份，支持手机号或邮箱。
+- `users`：账号在工作空间内的成员关系，承载客户 RBAC。
+- `tenants`：工作空间，承载套餐、试用、订阅周期与数据边界。
+- `sites`：客户自己的网站，每个站点生成独立 Site Key 与 32 位加载令牌 `loader_token`。
+- `applications`：平台销售线索池，与客户自己的 `leads` 分离。
+- `orders` / `payment_events`：自助订单、发票号、支付回调与幂等事件。
+- `support_tickets` / `ticket_messages`：客户与平台运营的工单对话。
+- `platform_users` / `platform_audit_logs`：平台运营身份与审计。
+
+一个人可以加入多个工作空间，登录后通过账号菜单切换；平台运营数据不写入任何客户工作空间。
+
+## 自助订阅与支付
+
+- 套餐页选择月付或年付，服务端按 `plans.js` 计算订单金额，客户端传入的价格无效。
+- 开发环境 `PAYMENT_PROVIDER=mock` 时可直接模拟支付；生产环境需接入支付渠道适配器。
+- 支付回调地址：`POST /api/public/payments/webhook/:provider`。
+- 回调使用 `x-payment-signature` HMAC-SHA256 验签，校验订单金额，并以 `event_id` 做幂等。
+- 支付成功后立即更新套餐、订阅周期、发票号，并发送站内通知。
+- 订阅到期先进入 7 天宽限期（`past_due`），仍未续费则降级免费版；取消续费在当前周期结束后降级。
+- 已支付订单生成 `invoice_no` 和发票记录；PDF/税务对接属于后续能力。
+
+## PQL 与支持工单
+
+PQL 由生命周期任务每小时评估：工作空间已安装 JS、访客数不少于 50，且会话不少于 5 或线索不少于 2 时，自动生成 `applications.source='pql'` 的销售线索，按未关闭线索数分配给销售；30 天内不重复生成。
+
+客户在「帮助与工单」提交问题，运营后台「支持工单」回复。客户追加回复会把状态改回 `open`，运营回复后进入 `pending`；双方可以标记解决或关闭。
 
 ## 接入方式
 
 ```html
-<script async src="https://your-domain.com/widget.js?key=YOUR_SITE_KEY"></script>
+<script async src="https://your-domain.com/qz.js?YOUR_LOADER_TOKEN"></script>
 ```
 
 加载器约 4KB，异步执行；挂件、聊天内核、Socket.IO 客户端均在浏览器空闲或访客产生交互后按需加载。新增能力由后台开启，不需要客户再次修改代码。
+
+后台生成的嵌入代码始终是完整的绝对地址，例如 `https://your-saas.com/qz.js?<32位随机令牌>`。URL 不出现 `widget`、`key` 等业务词，每个站点使用独立的 32 位十六进制令牌。部署在反向代理后会自动读取 `X-Forwarded-Proto`、`X-Forwarded-Host` 和 `X-Forwarded-Prefix`；也可以通过 `PUBLIC_BASE` 固定对外地址。公开 API 已开启跨域访问，客户网站可以直接从其他域名加载挂件。
+
+加载器只允许在页面中以脚本方式加载：直接打开 `qz.js` 或 `qz-core.js` 会返回 404，脚本文件除首行版权头外不包含注释。该限制基于 `Sec-Fetch-Dest` 与 `Referer`，属于基础防盗用措施，不能替代服务端鉴权。
 
 ## 技术栈
 
@@ -54,10 +121,10 @@ npm start
 | 服务端 | Node.js 22 + Express 4 + Socket.IO 4 |
 | 数据库 | Node 内置 `node:sqlite`（WAL），零外部服务 |
 | 上传 | Multer，文件落盘到 `uploads/`，白名单扩展名校验 |
-| 认证 | scrypt 密码哈希 + HMAC-SHA256 签名 Token |
+| 认证 | scrypt 密码哈希 + HMAC-SHA256 签名 Token；账号与工作空间成员分离，平台运营独立认证域 |
 | 前端 | 原生 ES5/ES2017 + Apollo UI（玻璃拟态），无构建步骤 |
 | 实时 | WebSocket，房间模型 `tenant:*` / `conv:*` / `agent:*` |
-| 测试 | Node 脚本冒烟测试（77 项）+ Playwright 浏览器测试（28 项） |
+| 测试 | Node 脚本冒烟测试（110 项）+ Playwright 浏览器测试（37 项） |
 
 ## 目录结构
 
@@ -70,15 +137,19 @@ server/
   auth.js             密码、Token、RBAC、套餐特性门禁
   socket.js           访客/客服实时协议
   upload.js           文件上传
-  routes/             public / auth / conversations / visitors / leads /
-                      reports / config / settings / external / landing
-  services/           geo / scoring / presence / ratify / notify / ai
+  routes/             public / payments / auth / signup / onboarding / ops / support /
+                      conversations / visitors / leads / reports / config / settings / external / landing
+  services/           geo / scoring / presence / ratify / notify / ai / provision / lifecycle /
+                      billing / pql
   test/               smoke.js / ui.js
 public/
   index.html          产品落地页
-  admin/              管理后台 SPA（hash 路由，多页面脚本）
-  widget.js           轻量加载器
-  widget-core.js      挂件内核（Shadow DOM）
+  admin/              客户管理后台 SPA（hash 路由，多页面脚本）
+  ops/                平台运营后台 SPA（账号、工作空间、申请、订阅、订单、工单、风控）
+  signup/             自助注册页
+  widget.js           旧版加载器入口（保留兼容）
+  qz.js               新加载器（服务端按令牌注入站点，禁止直接访问）
+  widget-core.js      挂件内核（通过 /qz-core.js 提供）
   demo/               演示宿主站点
   privacy.html        隐私说明
   assets/             Apollo UI 与落地页样式
@@ -99,6 +170,13 @@ docs/ARCHITECTURE.md  架构、数据库与接口规划
 - 前端菜单置灰并提示升级套餐
 - 后端每个敏感接口都做 `featureGate`，绕过 UI 也无法越权
 - 角色权限：管理员全部；运营可配置与看报表；客服仅接待、访客基础档案与线索跟进
+- 平台运营角色：superadmin / ops / sales / support / finance，与客户 RBAC 完全隔离
+- 自助注册只创建账号与工作空间，客户登录后在站点管理添加自己的网站
+- 自助注册默认开通 14 天专业版试用，试用到期自动降级免费版并保留数据
+- 自助订阅支持月付/年付，订单金额由服务端计算；开发环境可模拟支付，生产环境使用验签回调开通
+- 付费订阅到期进入 7 天宽限期，未续费自动降级免费版；取消续费会在当前周期结束后降级
+- 支持工单由客户后台提交，运营后台回复，客户收到站内通知
+- PQL 自动识别高意向工作空间，进入平台销售线索池
 
 ## 测试
 
@@ -106,15 +184,15 @@ docs/ARCHITECTURE.md  架构、数据库与接口规划
 # 需先启动服务
 npm start
 
-# API + 实时通讯冒烟测试（77 项）
+# API + 实时通讯冒烟测试（110 项）
 npm test
 
-# 浏览器端到端测试（需要 Playwright Chromium）
+# 浏览器端到端测试（36 项，需要 Playwright Chromium）
 npx playwright install chromium
 npm run test:ui
 ```
 
-UI 测试截图输出到 `/tmp/shots/`。
+测试默认访问 `http://localhost:3000`，可通过 `BASE_URL` 覆盖。UI 测试截图输出到 `/tmp/shots/`。
 
 ## 环境变量
 
@@ -124,8 +202,13 @@ UI 测试截图输出到 `/tmp/shots/`。
 | `HOST` | 监听地址 | `0.0.0.0` |
 | `APP_SECRET` | Token 签名密钥，生产必须修改 | 开发默认值 |
 | `DB_FILE` | SQLite 文件路径 | `data/app.db` |
-| `PUBLIC_BASE` | 对外访问域名，用于生成嵌入代码 | 请求 Host |
+| `PUBLIC_BASE` | 对外访问基址（含协议和可选路径前缀），用于生成绝对嵌入代码；留空时按请求 Host / `X-Forwarded-*` 自动生成 | 请求 Host |
 | `GEO_API` | IP 归属地接口模板，`{ip}` 占位 | 本地确定性映射 |
+| `SMS_WEBHOOK` | 注册短信发送 Webhook，POST `{phone, code, scene}` | 未配置时开发环境返回演示验证码 |
+| `SIGNUP_DEV_CODE` | 设为 `false` 时生产环境不返回验证码 | 开发环境返回 |
+| `PAYMENT_PROVIDER` | 支付渠道标识，开发默认 `mock` | `mock` |
+| `PAYMENT_WEBHOOK_SECRET` | 支付回调 HMAC 验签密钥，生产必须配置 | 回退 `APP_SECRET` |
+| `ALLOW_PLAN_SWITCH` | 生产环境设为 `1` 才开放演示套餐切换接口 | 仅开发环境 |
 
 ## 生产化说明
 
@@ -136,8 +219,13 @@ UI 测试截图输出到 `/tmp/shots/`。
 - 多语言翻译：内置短语词典，可替换为翻译 API
 - 自定义域名：已完成配置与白标展示，生产环境需在网关/DNS 侧绑定证书与路由
 - 告警通知：钉钉/企业微信 Webhook 已接通，发送失败会静默降级为站内通知
+- 注册短信：开发环境直接返回演示验证码；生产环境必须配置 `SMS_WEBHOOK` 并设置 `SIGNUP_DEV_CODE=false`
+- 自助支付：订单、订阅与回调链路已完成，开发环境使用模拟支付；生产环境需接入微信/支付宝适配器并配置 `PAYMENT_WEBHOOK_SECRET`
+- 发票：已支付订单生成发票号与记录，PDF/税务对接属于后续能力
+- 订阅续费：当前采用手动续费，自动扣款需要保存支付协议并接入渠道的签约/代扣能力
+- 平台运营：建议使用独立子域名、MFA 和 IP 白名单限制 `/ops/` 访问
 
-安全的默认实践：租户隔离、参数校验、上传白名单、消息频率限制、敏感词拦截、黑名单、审计日志、追踪总开关与访客拒绝追踪。
+安全的默认实践：租户隔离、参数校验、上传白名单、消息频率限制、敏感词拦截、黑名单、审计日志与追踪总开关。
 
 ## 文档
 

@@ -28,7 +28,7 @@
       </nav>
       <div class="nav-actions">
         <a class="btn btn-ghost btn-sm" href="/admin/">登录工作台</a>
-        <a class="btn btn-primary btn-sm" href="#trial">免费试用</a>
+        <a class="btn btn-primary btn-sm" href="/signup">免费注册</a>
         <button class="nav-toggle" id="nav-toggle" aria-label="打开菜单">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
         </button>
@@ -46,15 +46,15 @@
           <h1>把官网变成<br><span class="grad">线索引擎</span></h1>
           <p class="hero-sub">客户网站只需要嵌入一段 JS。在线客服、访客行为采集、主动弹窗、知识库、录屏与轻线索 CRM 全部复用同一个钩子，后台开启即生效，不用二次埋点。</p>
           <div class="hero-cta">
-            <a class="btn btn-primary btn-lg" href="#trial">免费试用 14 天</a>
-            <a class="btn btn-ghost btn-lg" href="#how">看一段 JS 如何工作</a>
+            <a class="btn btn-primary btn-lg" href="/signup">免费注册，10 分钟接入</a>
+            <a class="btn btn-ghost btn-lg" href="#trial">预约团队演示</a>
           </div>
           <div class="hero-stats">
             <div><b>38%</b><span>平均留资率提升</span></div>
             <div><b>5 分钟</b><span>完成接入上线</span></div>
             <div><b>1 段</b><span>代码长期复用</span></div>
           </div>
-          <div class="hero-note">右下角挂件就是真实产品，直接点开体验。</div>
+          <div class="hero-note">个人站长可直接注册；团队/企业可预约顾问演示。右下角挂件就是真实产品。</div>
         </div>
 
         <div class="hero-visual reveal">
@@ -107,6 +107,32 @@
       </div>
     </section>
 
+    <section class="section path-section">
+      <div class="wrap">
+        <div class="section-head center reveal">
+          <span class="kicker">两种开始方式</span>
+          <h2>自己接入，或让顾问带你接入</h2>
+          <p>同一套产品，两种服务方式。个人网站和小团队可以自己跑通，团队采购可以预约演示。</p>
+        </div>
+        <div class="path-grid">
+          <article class="path-card reveal">
+            <span class="path-tag">个人站长 / 独立开发者</span>
+            <h3>免费注册，马上看到效果</h3>
+            <p>注册后进入后台添加自己的网站，复制一段 JS 放到页面即可。访客咨询、轨迹和线索都来自你的真实场景，不需要额外演示站。</p>
+            <ul><li>14 天专业版试用，不绑卡</li><li>后台添加网站 + 接入向导</li><li>安装检测与首条会话提醒</li><li>到期自动降级免费版</li></ul>
+            <a class="btn btn-primary" href="/signup">免费注册</a>
+          </article>
+          <article class="path-card path-team reveal">
+            <span class="path-tag">团队 / 企业</span>
+            <h3>预约演示，按团队方案接入</h3>
+            <p>适合多站点、客服团队、外贸独立站和需要合同/发票的客户。顾问会用你的网站做一次真实接入演示，再确定套餐与权限。</p>
+            <ul><li>多站点与子账号权限</li><li>合同、发票与 SLA</li><li>私有化与开放 API</li><li>客户成功协助上线</li></ul>
+            <a class="btn btn-ghost" href="#trial">预约 20 分钟演示</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
     <section class="section" id="pain">
       <div class="wrap">
         <div class="section-head reveal">
@@ -132,7 +158,7 @@
         </div>
         <div class="code-hero reveal">
           <div class="code-hero-copy">
-            <div class="code-line"><span class="ln">1</span><span class="tag">&lt;script</span> <span class="attr">async</span> <span class="attr">src</span>=<span class="str">"https://cdn.qingzhan.cn/widget.js?key=YOUR_KEY"</span><span class="tag">&gt;&lt;/script&gt;</span></div>
+            <div class="code-line"><span class="ln">1</span><span class="tag">&lt;script</span> <span class="attr">async</span> <span class="attr">src</span>=<span class="str">"https://cdn.qingzhan.cn/qz.js?YOUR_LOADER_TOKEN"</span><span class="tag">&gt;&lt;/script&gt;</span></div>
             <div class="code-meta"><span class="pill-dot"></span>约 4KB 加载器 · 异步 · 不阻塞首屏</div>
             <div class="code-actions">
               <button class="btn btn-primary btn-sm" id="copy-code">复制接入代码</button>
@@ -190,12 +216,6 @@
             <h3>访客录屏与自助知识库</h3>
             <p>访客一键录制当前页面发给客服，排查看不到的问题；聊天内嵌入 FAQ 分类与资料下载，解决不了再转人工。</p>
             <div class="rec-demo"><span class="rec-dot"></span> REC 00:38 <span>正在录制当前页面</span></div>
-          </article>
-          <article class="cap-card reveal">
-            <div class="cap-tag green">合规能力</div>
-            <h3>追踪开关与隐私提示</h3>
-            <p>后台一键关闭行为采集，首次访问展示隐私提示，访客可以拒绝行为追踪。拒绝后仍可正常咨询，仅保留匿名会话。</p>
-            <div class="compliance-demo"><span>我们使用 Cookie 记录访问轨迹以改善服务。</span><button>同意</button><button class="ghost">拒绝追踪</button></div>
           </article>
           <article class="cap-card reveal">
             <div class="cap-tag orange">全版本</div>
@@ -268,7 +288,7 @@
             <ul>
               <li>基础聊天与离线留言</li><li>1 个客服账号</li><li>基础挂件配置</li><li>基础访问统计</li><li class="off">主动触发与表单</li><li class="off">线索 CRM 与报表</li>
             </ul>
-            <a class="btn btn-ghost" href="#trial">免费开始</a>
+            <a class="btn btn-ghost" href="/signup">免费注册</a>
           </article>
           <article class="price-card reveal">
             <div class="pc-head"><h3>标准版</h3><span class="pc-tag">让访客开口</span></div>
@@ -277,7 +297,7 @@
             <ul>
               <li>主动触发弹窗</li><li>自定义线索表单</li><li>基础访客画像与来源统计</li><li>3 个子账号</li><li>关键词自动回复</li><li>满意度评价</li>
             </ul>
-            <a class="btn btn-ghost" href="#trial">开始试用</a>
+            <a class="btn btn-ghost" href="/signup">开始试用</a>
           </article>
           <article class="price-card pro reveal">
             <span class="pc-ribbon">主推</span>
@@ -287,7 +307,7 @@
             <ul>
               <li>转化漏斗与客服绩效</li><li>意向自动打分 + 标签</li><li>轻线索 CRM 与导出</li><li>区域热力图与流失访客</li><li>自动化规则引擎</li><li>访客录屏与知识库</li><li>10 个坐席 / 5 个站点</li>
             </ul>
-            <a class="btn btn-primary" href="#trial">免费试用 14 天</a>
+            <a class="btn btn-primary" href="/signup">免费试用 14 天</a>
           </article>
           <article class="price-card reveal">
             <div class="pc-head"><h3>企业版</h3><span class="pc-tag">为增长团队定制</span></div>
@@ -299,7 +319,7 @@
             <a class="btn btn-ghost" href="#trial">联系销售</a>
           </article>
         </div>
-        <div class="price-foot reveal">所有付费套餐均含无限访客、HTTPS、数据隔离与合规追踪开关。年付按 10 个月计费。</div>
+        <div class="price-foot reveal">所有付费套餐均含无限访客、HTTPS、数据隔离与行为采集开关。年付按 10 个月计费。</div>
       </div>
     </section>
 
@@ -312,7 +332,7 @@
         </div>
         <div class="guide-grid">
           <div class="guide-step reveal"><span class="gs-no">STEP 01</span><h3>创建站点</h3><p>登录后台 → 站点管理 → 添加站点，填写名称与域名。每个站点会生成独立 Site Key。</p><div class="gs-mock"><div class="gs-row"><span></span><b>云图科技官网</b><em>qz_demo_8f3k2m</em></div></div></div>
-          <div class="guide-step reveal"><span class="gs-no">STEP 02</span><h3>复制代码</h3><p>复制脚本标签，粘贴到网站 &lt;head&gt; 或 &lt;body&gt; 末尾。脚本异步加载，不影响首屏。</p><div class="gs-code">&lt;script async src="https://cdn.qingzhan.cn/widget.js?key=YOUR_KEY"&gt;&lt;/script&gt;</div></div>
+          <div class="guide-step reveal"><span class="gs-no">STEP 02</span><h3>复制代码</h3><p>复制脚本标签，粘贴到网站 &lt;head&gt; 或 &lt;body&gt; 末尾。脚本异步加载，不影响首屏。</p><div class="gs-code">&lt;script async src="https://cdn.qingzhan.cn/qz.js?YOUR_LOADER_TOKEN"&gt;&lt;/script&gt;</div></div>
           <div class="guide-step reveal"><span class="gs-no">STEP 03</span><h3>后台开启能力</h3><p>挂件外观、触发规则、表单、知识库、AI 与报表都在后台配置，无需客户再改代码。</p><div class="gs-mock"><div class="gs-toggle"><span>主动触发</span><i class="on"></i></div><div class="gs-toggle"><span>行为采集</span><i class="on"></i></div><div class="gs-toggle"><span>AI 接待</span><i></i></div></div></div>
         </div>
         <div class="guide-note reveal"><b>常见建站平台：</b>WordPress 在 footer.php 的 &lt;/body&gt; 前粘贴；Shopify 在 theme.liquid 中粘贴；Vue/React/Next.js 放到根布局或 public/index.html；小程序建议使用企业版开放 API。</div>
@@ -360,7 +380,7 @@
           <details class="faq-item" open><summary>一段 JS 真的能启用全部访客能力吗？</summary><p>是的。脚本会自动加载客服挂件、行为采集、触发弹窗、知识库、录屏等能力，后续新增功能无需再次改代码，后台开启即可生效。</p></details>
           <details class="faq-item"><summary>会影响网站打开速度吗？</summary><p>不会。首屏只加载约 4KB 的异步加载器，挂件与聊天内核在浏览器空闲时按需加载，不阻塞页面渲染。</p></details>
           <details class="faq-item"><summary>被广告拦截插件拦截怎么办？</summary><p>后台会统计挂件拦截率与事件。我们支持独立域名加载脚本与表单降级入口，可显著降低拦截影响。</p></details>
-          <details class="faq-item"><summary>数据安全与合规怎么处理？</summary><p>数据按租户隔离，支持一键关闭行为采集、隐私提示弹窗与访客拒绝追踪。企业版可提供独立部署与数据导出方案。</p></details>
+          <details class="faq-item"><summary>数据安全怎么处理？</summary><p>数据按租户隔离，支持一键关闭行为采集。企业版可提供独立部署与数据导出方案。</p></details>
           <details class="faq-item"><summary>支持多个网站吗？</summary><p>支持。一个账号下可添加多个站点，每个站点独立生成 JS，访客、会话、线索与报表按站点隔离统计。</p></details>
           <details class="faq-item"><summary>可以试用多久？</summary><p>专业版提供 14 天全功能试用，无需信用卡。试用结束后可降级到免费版继续使用基础聊天。</p></details>
         </div>
@@ -370,11 +390,11 @@
     <section class="section trial-section" id="trial">
       <div class="wrap trial-card reveal">
         <div class="trial-copy">
-          <span class="kicker light">开始你的第一段 JS</span>
-          <h2>今天接入，明天就能<br>看见访客为什么离开</h2>
-          <p>提交信息后，顾问会带着你的网站做一次真实接入演示。也可以直接登录演示后台，先摸一遍所有功能。</p>
+          <span class="kicker light">团队 / 企业通道</span>
+          <h2>让顾问带你做一次<br>真实接入演示</h2>
+          <p>提交信息后，顾问会带着你的网站做一次真实接入演示。想自己先研究，可以直接免费注册。</p>
           <div class="trial-points"><span>14 天全功能试用</span><span>免费接入辅导</span><span>随时降级免费版</span></div>
-          <a class="trial-login" href="/admin/">或直接进入演示后台 →</a>
+          <a class="trial-login" href="/signup">或直接免费注册，自己接入 →</a>
         </div>
         <form class="trial-form" id="trial-form">
           <h3>免费试用 / 预约演示</h3>
@@ -399,14 +419,14 @@
         <p>一段 JS，把官网变成线索引擎。客服、访客行为、营销触达与轻线索 CRM 一体化。</p>
       </div>
       <div class="footer-col"><b>产品</b><a href="#capability">在线客服</a><a href="#capability">行为分析</a><a href="#capability">主动触达</a><a href="#capability">线索 CRM</a></div>
-      <div class="footer-col"><b>资源</b><a href="#guide">接入教程</a><a href="#faq">常见问题</a><a href="/demo/">在线演示</a><a href="/admin/">管理后台</a></div>
+      <div class="footer-col"><b>资源</b><a href="/signup">免费注册</a><a href="#guide">接入教程</a><a href="#faq">常见问题</a><a href="/demo/">在线演示</a><a href="/admin/">管理后台</a></div>
       <div class="footer-col"><b>公司</b><a href="#cases">客户案例</a><a href="#pricing">套餐价格</a><a href="#trial">联系销售</a><a href="/api/health">服务状态</a></div>
     </div>
-    <div class="wrap footer-bottom"><span>© 2026 轻站线索客服 · 一段代码，完整闭环</span><span>数据隔离 · 合规追踪 · 广告拦截上报</span></div>
+    <div class="wrap footer-bottom"><span>© 2026 轻站线索客服 · 一段代码，完整闭环</span><span>数据隔离 · 追踪开关 · 广告拦截上报</span></div>
   </footer>
 
   <div class="toast-holder" id="toast-holder"></div>
   <script src="/assets/landing.js"></script>
-  <script async src="/widget.js?key=qz_demo_8f3k2m"></script>
+  <script async src="/qz.js?0f928e95b1adc3f89d3a1e0dab18c5bf"></script>
 </body>
 </html>

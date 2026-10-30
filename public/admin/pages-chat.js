@@ -493,7 +493,7 @@
       '<div class="side-block"><h4>访客信息 <button class="tiny" data-open-profile style="border:none;background:none;color:#2563eb;cursor:pointer">完整档案</button></h4>' +
       kv('手机号', v.phone || '未留资') + kv('邮箱', v.email || '-') + kv('公司', v.company || '-') + kv('业务', v.businessType || '-') +
       kv('来源', A.sourceLabel(v.source) + (v.keyword ? ' / ' + v.keyword : '')) + kv('设备', (v.os || '') + ' ' + (v.browser || '')) + kv('访问次数', v.visitCount + ' 次 / ' + v.pageviewCount + ' 页') +
-      kv('首次访问', A.fmtTime(v.firstSeen)) + kv('合规状态', v.trackingConsent ? '已同意追踪' : '已拒绝追踪') + '</div>' +
+      kv('首次访问', A.fmtTime(v.firstSeen)) + kv('行为采集', '已开启') + '</div>' +
       '<div class="side-block"><h4>最近页面</h4>' + (d.recentPages.length ? d.recentPages.slice(0, 6).map(function (p) {
         return '<div class="page-mini"><span class="p-ico">' + A.icon('eye', 11) + '</span><span style="min-width:0"><b>' + A.esc(p.title || p.url) + '</b><span>' + A.esc(p.url) + ' · ' + Math.round((p.dwell_ms || 0) / 1000) + 's</span></span></div>';
       }).join('') : '<div class="tiny muted">暂无页面记录</div>') + '</div>' +

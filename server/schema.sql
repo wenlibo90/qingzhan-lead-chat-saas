@@ -12,13 +12,42 @@ CREATE TABLE IF NOT EXISTS tenants (
   hide_branding INTEGER NOT NULL DEFAULT 0,
   custom_domain TEXT,
   trial_ends_at TEXT,
+  plan_status TEXT NOT NULL DEFAULT 'active',
+  trial_started_at TEXT,
+  signup_source TEXT,
+  signup_ip TEXT,
+  risk_score INTEGER NOT NULL DEFAULT 0,
+  onboarding_state TEXT NOT NULL DEFAULT '{}',
+  billing_cycle TEXT NOT NULL DEFAULT 'monthly',
+  current_period_start TEXT,
+  current_period_end TEXT,
+  cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
+  last_payment_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS accounts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  phone TEXT,
+  email TEXT,
+  name TEXT,
+  password_hash TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active',
+  signup_source TEXT,
+  signup_ip TEXT,
+  risk_score INTEGER NOT NULL DEFAULT 0,
+  last_login_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_phone ON accounts(phone) WHERE phone IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_email ON accounts(email) WHERE email IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   tenant_id INTEGER NOT NULL REFERENCES tenants(id),
-  email TEXT NOT NULL UNIQUE,
+  account_id INTEGER REFERENCES accounts(id),
+  email TEXT,
+  phone TEXT,
   name TEXT NOT NULL,
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'agent',
@@ -26,7 +55,8 @@ CREATE TABLE IF NOT EXISTS users (
   status TEXT NOT NULL DEFAULT 'active',
   permissions TEXT DEFAULT '[]',
   last_login_at TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(tenant_id, email)
 );
 CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);
 
@@ -36,10 +66,15 @@ CREATE TABLE IF NOT EXISTS sites (
   name TEXT NOT NULL,
   domain TEXT,
   site_key TEXT NOT NULL UNIQUE,
+  loader_token TEXT,
   widget_config TEXT NOT NULL DEFAULT '{}',
   tracking_enabled INTEGER NOT NULL DEFAULT 1,
   compliance_enabled INTEGER NOT NULL DEFAULT 1,
   blocked INTEGER NOT NULL DEFAULT 0,
+  is_sandbox INTEGER NOT NULL DEFAULT 0,
+  installed_at TEXT,
+  last_widget_ping_at TEXT,
+  sandbox_visited_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_sites_tenant ON sites(tenant_id);
@@ -399,3 +434,134 @@ CREATE TABLE IF NOT EXISTS rate_limits (
   count INTEGER NOT NULL DEFAULT 0,
   window_start INTEGER NOT NULL
 );
+
+
+CREATE TABLE IF NOT EXISTS platform_users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'ops',
+  status TEXT NOT NULL DEFAULT 'active',
+  last_login_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS applications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  phone TEXT,
+  email TEXT,
+  company TEXT,
+  website TEXT,
+  size TEXT,
+  channel TEXT,
+  message TEXT,
+  source TEXT NOT NULL DEFAULT 'landing',
+  status TEXT NOT NULL DEFAULT 'new',
+  owner_id INTEGER,
+  account_id INTEGER,
+  tenant_id INTEGER,
+  utm_source TEXT,
+  utm_medium TEXT,
+  utm_campaign TEXT,
+  ip TEXT,
+  last_contact_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status, created_at);
+
+CREATE TABLE IF NOT EXISTS application_activities (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  application_id INTEGER NOT NULL,
+  platform_user_id INTEGER,
+  type TEXT NOT NULL DEFAULT 'note',
+  content TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_app_activities ON application_activities(application_id);
+
+CREATE TABLE IF NOT EXISTS sms_codes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  phone TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  purpose TEXT NOT NULL DEFAULT 'signup',
+  attempts INTEGER NOT NULL DEFAULT 0,
+  used INTEGER NOT NULL DEFAULT 0,
+  ip TEXT,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sms_phone ON sms_codes(phone, purpose, used);
+
+CREATE TABLE IF NOT EXISTS platform_audit_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  platform_user_id INTEGER,
+  action TEXT NOT NULL,
+  target TEXT,
+  detail TEXT,
+  ip TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+
+CREATE TABLE IF NOT EXISTS orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_no TEXT NOT NULL UNIQUE,
+  tenant_id INTEGER NOT NULL,
+  plan TEXT NOT NULL,
+  cycle TEXT NOT NULL DEFAULT 'monthly',
+  amount_cents INTEGER NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'CNY',
+  status TEXT NOT NULL DEFAULT 'pending',
+  provider TEXT NOT NULL DEFAULT 'mock',
+  provider_trade_no TEXT,
+  idempotency_key TEXT,
+  invoice_no TEXT,
+  created_by INTEGER,
+  paid_at TEXT,
+  period_start TEXT,
+  period_end TEXT,
+  expires_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_orders_tenant ON orders(tenant_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+
+CREATE TABLE IF NOT EXISTS payment_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_id TEXT NOT NULL UNIQUE,
+  order_id INTEGER,
+  provider TEXT NOT NULL,
+  amount_cents INTEGER,
+  status TEXT,
+  raw TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS support_tickets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL,
+  user_id INTEGER,
+  subject TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'other',
+  priority TEXT NOT NULL DEFAULT 'normal',
+  status TEXT NOT NULL DEFAULT 'open',
+  last_message_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_support_tenant ON support_tickets(tenant_id, status);
+
+CREATE TABLE IF NOT EXISTS ticket_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ticket_id INTEGER NOT NULL,
+  sender_type TEXT NOT NULL,
+  sender_id INTEGER,
+  sender_name TEXT,
+  content TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_ticket_messages ON ticket_messages(ticket_id, id);

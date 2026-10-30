@@ -5,6 +5,8 @@ const { authRequired, requireRole, featureGate, hashPassword, signApiKey } = req
 const { audit, publicUser, tenantPublic } = require('../helpers');
 const { PLANS, planOf, featuresOf, FEATURES, limitOf, hasFeature } = require('../plans');
 const ai = require('../services/ai');
+const { ensureAccount } = require('../services/provision');
+const billing = require('../services/billing');
 
 const router = express.Router();
 router.use(authRequired);
@@ -12,10 +14,11 @@ router.use(authRequired);
 // ---------- team ----------
 router.get('/users', requireRole('admin', 'operator'), (req, res) => {
   const users = all(
-    `SELECT u.id, u.name, u.email, u.role, u.avatar, u.status, u.last_login_at, u.created_at,
+    `SELECT u.id, u.name, u.email, u.phone, u.role, u.avatar, u.status, u.last_login_at, u.created_at,
+            a.email AS account_email, a.phone AS account_phone,
             (SELECT COUNT(*) FROM conversations c WHERE c.agent_id = u.id) AS conversations,
             (SELECT COUNT(*) FROM leads l WHERE l.owner_id = u.id) AS leads
-     FROM users u WHERE u.tenant_id = ? ORDER BY u.id`,
+     FROM users u LEFT JOIN accounts a ON a.id = u.account_id WHERE u.tenant_id = ? ORDER BY u.id`,
     [req.tenant.id]
   );
   res.json({ users, limit: limitOf(req.tenant.plan, 'agents'), plan: req.tenant.plan });
@@ -31,12 +34,15 @@ router.post('/users', requireRole('admin'), (req, res) => {
   if (!b.name || !b.email || !b.password) return res.status(400).json({ error: '姓名、邮箱、初始密码不能为空' });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email)) return res.status(400).json({ error: '邮箱格式不正确' });
   if (String(b.password).length < 6) return res.status(400).json({ error: '密码至少 6 位' });
-  if (get('SELECT id FROM users WHERE email = ?', [String(b.email).toLowerCase()])) return res.status(400).json({ error: '该邮箱已注册' });
   if (!['agent', 'operator', 'admin'].includes(b.role)) return res.status(400).json({ error: '角色不合法' });
-  const id = run('INSERT INTO users (tenant_id, email, name, password_hash, role, avatar) VALUES (?,?,?,?,?,?)',
-    [req.tenant.id, String(b.email).toLowerCase().trim(), String(b.name).slice(0, 30), hashPassword(b.password), b.role, String(b.name).slice(0, 1)]).lastInsertRowid;
+  const { account } = ensureAccount({ name: b.name, email: b.email, phone: b.phone, password: b.password, source: 'invite' });
+  if (get('SELECT id FROM users WHERE tenant_id = ? AND account_id = ?', [req.tenant.id, account.id])) {
+    return res.status(400).json({ error: '该账号已经是当前工作空间成员' });
+  }
+  const id = run('INSERT INTO users (tenant_id, account_id, email, phone, name, password_hash, role, avatar) VALUES (?,?,?,?,?,?,?,?)',
+    [req.tenant.id, account.id, account.email, account.phone, String(b.name).slice(0, 30), account.password_hash, b.role, String(b.name).slice(0, 1)]).lastInsertRowid;
   audit(req, 'user.create', `user:${id}`, `${b.email} / ${b.role}`);
-  res.json({ ok: true, id });
+  res.json({ ok: true, id, account_created: account.id });
 });
 
 router.patch('/users/:id', requireRole('admin'), (req, res) => {
@@ -51,7 +57,15 @@ router.patch('/users/:id', requireRole('admin'), (req, res) => {
   for (const key of ['name', 'role', 'status', 'avatar']) {
     if (b[key] !== undefined) { updates.push(`${key} = ?`); params.push(String(b[key]).slice(0, 100)); }
   }
-  if (b.password) { updates.push('password_hash = ?'); params.push(hashPassword(b.password)); }
+  if (b.password) {
+    const hash = hashPassword(b.password);
+    updates.push('password_hash = ?'); params.push(hash);
+    if (u.account_id) run('UPDATE accounts SET password_hash = ? WHERE id = ?', [hash, u.account_id]);
+  }
+  if (b.name !== undefined) {
+    updates.push('name = ?'); params.push(String(b.name).slice(0, 30));
+    if (u.account_id) run('UPDATE accounts SET name = ? WHERE id = ?', [String(b.name).slice(0, 30), u.account_id]);
+  }
   if (!updates.length) return res.status(400).json({ error: '没有可更新字段' });
   params.push(u.id);
   run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
@@ -116,22 +130,87 @@ router.get('/billing', (req, res) => {
   const plan = planOf(req.tenant.plan);
   const usage = {
     agents: get("SELECT COUNT(*) c FROM users WHERE tenant_id = ? AND status = 'active'", [req.tenant.id]).c,
-    sites: get('SELECT COUNT(*) c FROM sites WHERE tenant_id = ?', [req.tenant.id]).c,
+    sites: get('SELECT COUNT(*) c FROM sites WHERE tenant_id = ? AND is_sandbox = 0', [req.tenant.id]).c,
     monthlyVisitors: get("SELECT COUNT(*) c FROM visitors WHERE tenant_id = ? AND first_seen >= datetime('now','start of month')", [req.tenant.id]).c,
     storageMb: Math.round(get('SELECT COALESCE(SUM(file_size),0) s FROM messages WHERE tenant_id = ?', [req.tenant.id]).s / 1024 / 1024)
   };
-  const invoices = [
-    { id: 'INV-2026-09', date: '2026-09-01', amount: plan.price, status: 'paid', plan: plan.name },
-    { id: 'INV-2026-08', date: '2026-08-01', amount: plan.price, status: 'paid', plan: plan.name }
-  ].filter((i) => plan.price > 0);
-  res.json({ plan: { ...plan, featuresDetail: featuresOf(req.tenant.plan).map((f) => FEATURES[f]) }, usage, plans: PLANS, invoices });
+  res.json({
+    plan: { ...plan, featuresDetail: featuresOf(req.tenant.plan).map((f) => FEATURES[f]) },
+    usage,
+    plans: PLANS,
+    subscription: billing.subscriptionOf(req.tenant),
+    orders: billing.listOrders(req.tenant.id),
+    invoices: billing.listInvoices(req.tenant.id),
+    payment: {
+      provider: billing.provider(),
+      mock: billing.mockEnabled(),
+      message: billing.mockEnabled() ? '开发环境支持模拟支付；生产环境需配置真实支付适配器。' : '支付通道待配置，可先联系销售开通。'
+    }
+  });
 });
 
+router.post('/billing/orders', requireRole('admin'), (req, res) => {
+  const planCode = String(req.body.plan || '');
+  const cycle = req.body.cycle === 'yearly' ? 'yearly' : 'monthly';
+  try {
+    const result = billing.createOrder({ tenantId: req.tenant.id, planCode, cycle, userId: req.user.id });
+    audit(req, 'billing.order_create', `order:${result.order.id}`, `${planCode} / ${cycle} / ¥${result.order.amount}`);
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(e.status || 400).json({ error: e.message });
+  }
+});
+
+router.post('/billing/orders/:id/pay', requireRole('admin'), (req, res) => {
+  const order = get('SELECT * FROM orders WHERE id = ? AND tenant_id = ?', [Number(req.params.id), req.tenant.id]);
+  if (!order) return res.status(404).json({ error: '订单不存在' });
+  if (!billing.mockEnabled()) return res.status(403).json({ error: '当前环境未启用模拟支付，请通过支付渠道完成' });
+  try {
+    const result = billing.applyPaidOrder(order.id, { providerTradeNo: 'MOCK-' + Date.now() });
+    audit(req, 'billing.pay', `order:${order.order_no}`, '模拟支付成功');
+    res.json({ ok: true, plan: planOf(result.tenant.plan), subscription: billing.subscriptionOf(result.tenant) });
+  } catch (e) {
+    res.status(e.status || 400).json({ error: e.message });
+  }
+});
+
+router.post('/billing/orders/:id/cancel', requireRole('admin'), (req, res) => {
+  try {
+    const order = billing.cancelOrder(Number(req.params.id), req.tenant.id);
+    audit(req, 'billing.order_cancel', `order:${order.order_no}`, '取消待支付订单');
+    res.json({ ok: true, order: billing.orderPublic(order) });
+  } catch (e) {
+    res.status(e.status || 400).json({ error: e.message });
+  }
+});
+
+router.post('/billing/downgrade', requireRole('admin'), (req, res) => {
+  const result = billing.scheduleDowngrade(req.tenant.id);
+  audit(req, 'billing.downgrade', `tenant:${req.tenant.id}`, result.immediate ? '立即降级免费版' : '预约到期降级免费版');
+  res.json({ ok: true, ...result, subscription: billing.subscriptionOf(result.tenant) });
+});
+
+router.post('/billing/resume', requireRole('admin'), (req, res) => {
+  const tenant = billing.resumeSubscription(req.tenant.id);
+  audit(req, 'billing.resume', `tenant:${req.tenant.id}`, '恢复自动续费');
+  res.json({ ok: true, subscription: billing.subscriptionOf(tenant) });
+});
+
+router.post('/billing/contact-sales', requireRole('admin'), (req, res) => {
+  const app = billing.contactSales(req.tenant.id, req.user.id, String(req.body.message || '').slice(0, 1000));
+  audit(req, 'billing.contact_sales', `application:${app.id}`, '企业版/定制咨询');
+  res.json({ ok: true, application: { id: app.id, status: app.status } });
+});
+
+// Development-only shortcut kept for demos and tests. The customer UI uses orders.
 router.post('/billing/change-plan', requireRole('admin'), (req, res) => {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_PLAN_SWITCH !== '1') {
+    return res.status(403).json({ error: '生产环境请通过订单与支付开通套餐' });
+  }
   const plan = String(req.body.plan || '');
   if (!PLANS.some((p) => p.code === plan)) return res.status(400).json({ error: '套餐不存在' });
-  run('UPDATE tenants SET plan = ? WHERE id = ?', [plan, req.tenant.id]);
-  audit(req, 'billing.change_plan', `tenant:${req.tenant.id}`, `${req.tenant.plan} -> ${plan}`);
+  run("UPDATE tenants SET plan = ?, plan_status = 'active' WHERE id = ?", [plan, req.tenant.id]);
+  audit(req, 'billing.change_plan', `tenant:${req.tenant.id}`, `${req.tenant.plan} -> ${plan} (demo)`);
   res.json({ ok: true, plan: planOf(plan) });
 });
 

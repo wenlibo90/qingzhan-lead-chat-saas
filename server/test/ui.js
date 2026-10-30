@@ -1,6 +1,7 @@
 'use strict';
 const { chromium } = require('playwright');
 const fs = require('node:fs');
+const http = require('node:http');
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000';
 const SHOTS = '/tmp/shots';
@@ -32,13 +33,30 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
   log('落地页加载，4 个套餐卡片');
   await page.screenshot({ path: SHOTS + '/01-landing.png', fullPage: true });
 
+  // cross-origin customer site: absolute embed must load core and config
+  const crossServer = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end('<!doctype html><html><head><meta charset="utf-8"><title>Customer Site</title></head><body><h1>Customer Site</h1><script async src="' + BASE + '/qz.js?0f928e95b1adc3f89d3a1e0dab18c5bf"></script></body></html>');
+  });
+  await new Promise((resolve) => crossServer.listen(3101, '127.0.0.1', resolve));
+  const crossPage = await ctx.newPage();
+  crossPage.on('pageerror', (e) => errors.push('cross-origin pageerror: ' + e.message));
+  crossPage.on('console', (m) => { if (m.type() === 'error') errors.push('cross-origin console: ' + m.text()); });
+  await crossPage.goto('http://127.0.0.1:3101/', { waitUntil: 'networkidle' });
+  await crossPage.waitForSelector('#qz-widget-host .qz-launcher', { timeout: 12000 });
+  await crossPage.locator('#qz-widget-host .qz-launcher').click();
+  await crossPage.waitForTimeout(800);
+  if (!(await crossPage.locator('#qz-widget-host .qz-panel.qz-open').count())) throw new Error('cross-origin widget panel failed');
+  await crossPage.screenshot({ path: SHOTS + '/01b-cross-origin-widget.png' });
+  log('跨域客户网站用绝对地址加载挂件');
+  await crossPage.close();
+  await new Promise((resolve) => crossServer.close(resolve));
+
   // widget on landing
   await page.waitForTimeout(800);
   const launcher = page.locator('#qz-widget-host .qz-launcher');
   await launcher.waitFor({ state: 'visible', timeout: 8000 });
   log('访客挂件异步注入完成');
-  const consent = page.locator('#qz-widget-host .qz-consent .qz-yes');
-  if (await consent.count()) { await consent.click(); log('隐私提示：同意追踪'); }
   await launcher.click();
   await page.waitForTimeout(900);
   await page.screenshot({ path: SHOTS + '/02-landing-widget.png' });
@@ -52,7 +70,7 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
   admin.on('console', (m) => { if (m.type() === 'error') errors.push('admin console: ' + m.text()); });
   await admin.goto(BASE + '/admin/', { waitUntil: 'networkidle' });
   await admin.screenshot({ path: SHOTS + '/03-admin-login.png' });
-  await admin.fill('input[name=email]', 'admin@demo.com');
+  await admin.fill('input[name=identifier]', 'admin@demo.com');
   await admin.fill('input[name=password]', 'admin123');
   await admin.click('#login-form button[type=submit]');
   await admin.waitForSelector('#app:not([hidden])', { timeout: 10000 });
@@ -72,8 +90,6 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
   await demo.screenshot({ path: SHOTS + '/05-demo.png', fullPage: true });
   const demoLauncher = demo.locator('#qz-widget-host .qz-launcher');
   await demoLauncher.waitFor({ state: 'visible', timeout: 8000 });
-  const demoConsent = demo.locator('#qz-widget-host .qz-consent .qz-yes');
-  if (await demoConsent.count()) await demoConsent.click();
   await demoLauncher.click();
   await demo.waitForTimeout(700);
   const prechatBtn = demo.locator('#qz-widget-host .qz-screen [data-submit-form]');
@@ -118,7 +134,7 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
   const pages = [
     ['visitors', 'visitor'], ['leads', 'lead'], ['reports', 'report'], ['widget', 'widget'], ['automation', 'automation'],
     ['knowledge', 'knowledge'], ['sites', 'sites'], ['forms', 'forms'], ['team', 'team'], ['billing', 'billing'],
-    ['settings', 'settings'], ['notifications', 'notifications'], ['logs', 'logs']
+    ['settings', 'settings'], ['notifications', 'notifications'], ['support', 'support'], ['logs', 'logs']
   ];
   for (const [key, file] of pages) {
     await admin.locator('[data-nav="' + key + '"]').click();
@@ -128,6 +144,38 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
     await admin.screenshot({ path: SHOTS + '/10-admin-' + file + '.png', fullPage: true });
     log('管理后台页面：' + title);
   }
+
+  // billing order flow
+  await admin.locator('[data-nav="billing"]').click();
+  await admin.waitForTimeout(1100);
+  const renew = admin.locator('[data-buy="pro"]');
+  if (await renew.count()) {
+    await renew.first().click();
+    await admin.waitForTimeout(500);
+    await admin.locator('.modal-card .modal-foot button').last().click();
+    await admin.waitForTimeout(900);
+    const payBtn = admin.locator('.modal-card .modal-foot button').last();
+    if (await payBtn.count()) {
+      await payBtn.click();
+      await admin.waitForTimeout(1800);
+      await admin.screenshot({ path: SHOTS + '/20-billing-paid.png', fullPage: true });
+      log('自助订单创建与模拟支付');
+    }
+  }
+
+  // dark mode
+  await admin.locator('[data-nav="dashboard"]').click();
+  await admin.waitForTimeout(900);
+  await admin.locator('[data-density]').click();
+  await admin.waitForTimeout(700);
+  const darkClass = await admin.locator('html').getAttribute('class');
+  if (!(darkClass || '').includes('au-dark')) throw new Error('dark mode class missing');
+  const cardBg = await admin.locator('.az-card').first().evaluate((el) => getComputedStyle(el).backgroundColor);
+  if (cardBg === 'rgb(255, 255, 255)' || cardBg === 'rgba(255, 255, 255, 0.78)') throw new Error('card stays light in dark mode: ' + cardBg);
+  await admin.screenshot({ path: SHOTS + '/20-dark-dashboard.png', fullPage: true });
+  await admin.locator('[data-density]').click();
+  await admin.waitForTimeout(500);
+  log('深色模式卡片与控件切换');
 
   // visitors detail
   await admin.locator('[data-nav="visitors"]').click();
@@ -176,8 +224,6 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
   await mp.screenshot({ path: SHOTS + '/14-mobile-landing.png', fullPage: true });
   const mLauncher = mp.locator('#qz-widget-host .qz-launcher');
   await mLauncher.waitFor({ state: 'visible', timeout: 8000 });
-  const mConsent = mp.locator('#qz-widget-host .qz-consent button').last();
-  if (await mConsent.count()) await mConsent.click();
   await mLauncher.click();
   await mp.waitForTimeout(800);
   await mp.screenshot({ path: SHOTS + '/15-mobile-widget.png' });
@@ -189,12 +235,85 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
   }
   const mInput = mp.locator('#qz-widget-host .qz-input');
   await mInput.waitFor({ state: 'visible', timeout: 8000 });
-  await mInput.fill('拒绝追踪后仍然可以咨询吗');
+  await mInput.fill('移动端可以直接发起咨询吗');
   await mp.locator('#qz-widget-host [data-act="send"]').click();
   await mp.waitForTimeout(1200);
   const mBubbles = await mp.locator('#qz-widget-host .qz-msg').count();
-  if (!mBubbles) throw new Error('declined-consent chat failed');
-  log('访客拒绝追踪后仍可发起咨询');
+  if (!mBubbles) throw new Error('mobile chat failed');
+  log('移动端访客可直接发起咨询');
+
+  // ---------- self-serve signup ----------
+  const signup = await ctx.newPage();
+  signup.on('pageerror', (e) => errors.push('signup pageerror: ' + e.message));
+  signup.on('console', (m) => { if (m.type() === 'error') errors.push('signup console: ' + m.text()); });
+  await signup.goto(BASE + '/signup/', { waitUntil: 'networkidle' });
+  await signup.waitForTimeout(500);
+  const signupPhone = '139' + String(Date.now()).slice(-8);
+  await signup.fill('input[name=phone]', signupPhone);
+  await signup.click('#send-code');
+  await signup.waitForTimeout(900);
+  const codeHint = await signup.locator('#code-hint').innerText();
+  if (!codeHint.includes('演示环境验证码')) throw new Error('signup code hint');
+  await signup.fill('input[name=password]', 'test1234');
+  await signup.click('#submit-btn');
+  await signup.waitForSelector('#app:not([hidden])', { timeout: 15000 });
+  await signup.waitForTimeout(1300);
+  if (!signup.url().includes('/admin/#/onboarding')) throw new Error('signup redirect: ' + signup.url());
+  const onbTitle = await signup.locator('#page h1').first().innerText();
+  if (onbTitle !== '接入向导') throw new Error('onboarding title ' + onbTitle);
+  await signup.screenshot({ path: SHOTS + '/16-signup-onboarding.png', fullPage: true });
+  log('自助注册并进入接入向导');
+  if (await signup.locator('a[href^="/sandbox/"]').count()) throw new Error('self-serve sandbox should be removed');
+  const addSite = signup.locator('[data-add-site]').first();
+  if (!(await addSite.count())) throw new Error('onboarding add-site action missing');
+  await addSite.click();
+  await signup.waitForTimeout(800);
+  await signup.locator('[data-new-site]').click();
+  await signup.waitForTimeout(400);
+  await signup.fill('[data-s="name"]', 'UI 测试独立站');
+  await signup.fill('[data-s="domain"]', 'www.ui-test-site.com');
+  await signup.locator('.modal-card .modal-foot button').last().click();
+  await signup.waitForTimeout(1800);
+  if (!(await signup.locator('.code-box').count())) throw new Error('new site embed missing');
+  const embedText = await signup.locator('.code-box').first().innerText();
+  if (!/src="https?:\/\/[^"]+\/qz\.js\?[a-f0-9]{32}/.test(embedText)) throw new Error('embed is not absolute: ' + embedText);
+  await signup.screenshot({ path: SHOTS + '/17-signup-site.png', fullPage: true });
+  log('注册后添加自己的网站并返回接入向导');
+
+  // ---------- platform ops ----------
+  const ops = await ctx.newPage();
+  ops.on('pageerror', (e) => errors.push('ops pageerror: ' + e.message));
+  ops.on('console', (m) => { if (m.type() === 'error') errors.push('ops console: ' + m.text()); });
+  await ops.goto(BASE + '/ops/', { waitUntil: 'networkidle' });
+  await ops.fill('input[name=email]', 'ops@platform.com');
+  await ops.fill('input[name=password]', 'ops123');
+  await ops.click('#ops-login-form button[type=submit]');
+  await ops.waitForSelector('#ops-app:not([hidden])', { timeout: 10000 });
+  await ops.waitForTimeout(1200);
+  await ops.screenshot({ path: SHOTS + '/18-ops-overview.png', fullPage: true });
+  log('平台运营后台登录');
+  for (const key of ['accounts', 'workspaces', 'applications', 'subscriptions', 'risk', 'tickets', 'team', 'logs']) {
+    await ops.click('[data-nav="' + key + '"]');
+    await ops.waitForTimeout(800);
+    const title = await ops.locator('.topbar-title').innerText();
+    if (!title) throw new Error('ops page ' + key);
+    await ops.screenshot({ path: SHOTS + '/19-ops-' + key + '.png' });
+  }
+  log('运营后台八个模块可打开');
+  await ops.click('[data-nav="tickets"]');
+  await ops.waitForTimeout(700);
+  const ticketBtn = ops.locator('[data-ticket]').first();
+  if (await ticketBtn.count()) {
+    await ticketBtn.click();
+    await ops.waitForTimeout(700);
+    await ops.screenshot({ path: SHOTS + '/21-ops-ticket-detail.png', fullPage: true });
+    log('运营工单详情与回复面板');
+    await ops.locator('.modal-close').click();
+    await ops.waitForTimeout(300);
+  }
+  const appRow = ops.locator('[data-nav="applications"]');
+  await appRow.click();
+  await ops.waitForTimeout(700);
 
   console.log('\n页面错误数：' + errors.length);
   errors.slice(0, 4).forEach((e) => console.log('  - ' + e));

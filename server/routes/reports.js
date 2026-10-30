@@ -60,7 +60,7 @@ router.get('/dashboard/overview', (req, res) => {
     [req.tenant.id, ...(sid ? [sid] : [])]
   );
   const agents = all("SELECT COUNT(*) c FROM users WHERE tenant_id = ? AND status = 'active' AND role IN ('agent','operator','admin')", [req.tenant.id])[0].c;
-  const siteCount = all('SELECT COUNT(*) c FROM sites WHERE tenant_id = ?', [req.tenant.id])[0].c;
+  const siteCount = all('SELECT COUNT(*) c FROM sites WHERE tenant_id = ? AND is_sandbox = 0', [req.tenant.id])[0].c;
   const monthlyVisitors = get("SELECT COUNT(*) c FROM visitors WHERE tenant_id = ? AND first_seen >= datetime('now', 'start of month')", [req.tenant.id]).c;
 
   res.json({

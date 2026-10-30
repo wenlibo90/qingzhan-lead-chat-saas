@@ -24,7 +24,7 @@
     vid = 'v_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
     LS.set('qz_vid_' + KEY, vid);
   }
-  var consent = LS.get('qz_consent_' + KEY, null);
+  var consent = '1';
   var sid = SS.get('qz_sid_' + KEY, '');
   var prechatData = LS.get('qz_prechat_' + KEY, '');
   var visits = parseInt(LS.get('qz_visits_' + KEY, '0'), 10) || 0;
@@ -449,17 +449,13 @@
       '.qz-announce-side{position:fixed;z-index:2147482997;width:250px;padding:14px 36px 14px 16px;border-radius:14px;font-size:12.5px;line-height:1.6;color:#fff;box-shadow:0 14px 36px rgba(15,23,42,.18);}' +
       '.qz-announce-side a{color:#fff;font-weight:700;display:block;margin-top:7px;font-size:11.5px;text-decoration:underline;text-underline-offset:3px;}' +
       '.qz-announce-side button{position:absolute;right:8px;top:8px;width:22px;height:22px;border:none;background:rgba(255,255,255,.16);border-radius:50%;color:#fff;cursor:pointer;font-size:14px;line-height:1;display:grid;place-items:center;}' +
-      '.qz-consent{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:2147483001;width:min(680px,calc(100vw - 180px));background:var(--qz-bg);border:1px solid var(--qz-line);border-radius:14px;box-shadow:0 18px 50px rgba(15,23,42,.2);padding:12px 14px;display:flex;align-items:center;gap:12px;font-size:12px;color:var(--qz-muted);line-height:1.55;animation:qzFade .3s ease;}' +
-      '.qz-consent-text{flex:1;}.qz-consent a{color:' + primary + ';text-decoration:underline;}' +
-      '.qz-consent button{border:none;border-radius:9px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;}' +
-      '.qz-consent .qz-yes{background:' + primary + ';color:#fff;}.qz-consent .qz-no{background:transparent;color:var(--qz-muted);}' +
       '.qz-toast{position:absolute;left:50%;bottom:90px;transform:translateX(-50%);background:rgba(15,23,42,.9);color:#fff;font-size:12px;padding:8px 14px;border-radius:999px;z-index:9;animation:qzFade .2s ease;max-width:86%;text-align:center;}' +
       '.qz-rec-indicator{position:absolute;top:76px;left:50%;transform:translateX(-50%);background:#ef4444;color:#fff;font-size:11px;padding:5px 12px;border-radius:999px;z-index:8;box-shadow:0 6px 18px rgba(239,68,68,.3);display:flex;align-items:center;gap:6px;}' +
       '.qz-imgview{position:absolute;inset:0;background:rgba(15,23,42,.92);z-index:20;display:grid;place-items:center;padding:20px;cursor:zoom-out;}' +
       '.qz-imgview img{max-width:100%;max-height:100%;border-radius:8px;}' +
       '@keyframes qzFade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}' +
       '@keyframes qzSlide{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}' +
-      '@media(max-width:640px){.qz-panel{inset:0!important;width:100%!important;height:100%!important;max-height:100vh;border-radius:0;border:none;}.qz-consent{bottom:80px;width:calc(100vw - 24px);flex-wrap:wrap;}.qz-consent-text{flex:1 1 100%;}.qz-proactive{left:12px!important;right:12px!important;bottom:86px!important;width:auto;}.qz-announce-side{display:none!important;}}' +
+      '@media(max-width:640px){.qz-panel{inset:0!important;width:100%!important;height:100%!important;max-height:100vh;border-radius:0;border:none;}.qz-proactive{left:12px!important;right:12px!important;bottom:86px!important;width:auto;}.qz-announce-side{display:none!important;}}' +
       '@media(prefers-reduced-motion:reduce){.qz-launcher,.qz-panel,.qz-msg,.qz-hint,.qz-proactive{animation:none!important;transition:none!important;}}';
   }
 
@@ -479,7 +475,6 @@
     renderLauncher();
     if (widget.showBranding) { /* branding inside panel */ }
     renderAnnouncement();
-    renderConsent();
     if (!widget.showBranding) { /* white label */ }
     // panel
     var panel = el('div', { class: 'qz-panel', role: 'dialog', 'aria-label': '在线客服' });
@@ -494,7 +489,6 @@
     window.Qingzhan.close = closeChat;
     window.Qingzhan.toggle = function () { chatOpen ? closeChat() : openChat(); };
     window.Qingzhan.track = function (name, payload) { trackEvent(name, payload); };
-    window.Qingzhan.setConsent = setConsent;
     window.Qingzhan.identify = function (data) {
       if (!data) return;
       if (data.phone) prechatData = JSON.stringify({ phone: data.phone, name: data.name || '' });
@@ -1200,34 +1194,6 @@
     });
   }
 
-  // ---------------- compliance ----------------
-  function renderConsent() {
-    if (!widget.compliance || !widget.compliance.enabled) return;
-    if (consent != null) return;
-    var bar = el('div', { class: 'qz-consent' });
-    var policy = widget.compliance.policyUrl ? ' <a href="' + esc(widget.compliance.policyUrl) + '" target="_blank" rel="noopener">隐私政策</a>' : '';
-    bar.innerHTML = '<div class="qz-consent-text">' + esc(widget.compliance.text || '我们使用 Cookie 记录访问轨迹以改善服务。') + policy + '</div><button class="qz-yes">同意</button><button class="qz-no">拒绝追踪</button>';
-    ui.shadow.appendChild(bar);
-    bar.querySelector('.qz-yes').addEventListener('click', function () {
-      setConsent(true);
-      bar.remove();
-    });
-    bar.querySelector('.qz-no').addEventListener('click', function () {
-      setConsent(false);
-      bar.remove();
-    });
-  }
-  function setConsent(v) {
-    consent = v ? '1' : '0';
-    LS.set('qz_consent_' + KEY, consent);
-    api('/api/public/consent', { body: { key: KEY, vid: vid, consent: !!v } }).catch(function () { });
-    if (v) startTracking();
-    else {
-      trackingOn = false;
-      if (rulesTimer) clearInterval(rulesTimer);
-    }
-  }
-
   // ---------------- queue & boot ----------------
   function flushQueue() {
     var q = QUEUE.splice(0, QUEUE.length);
@@ -1236,7 +1202,6 @@
       else if (item[0] === 'close') closeChat();
       else if (item[0] === 'toggle') chatOpen ? closeChat() : openChat();
       else if (item[0] === 'track') trackEvent(item[1], item[2]);
-      else if (item[0] === 'setConsent') setConsent(item[1]);
     });
   }
 
@@ -1260,11 +1225,6 @@
           }, 5000);
         }
         startTracking();
-        if (widget.compliance && widget.compliance.enabled && consent == null) {
-          // wait for consent
-        } else {
-          startTracking();
-        }
       })
       .catch(function (err) {
         if (window.console) console.warn('[Qingzhan] 加载配置失败', err.message);

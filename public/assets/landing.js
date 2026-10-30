@@ -67,7 +67,7 @@
     }, 2400);
   }
 
-  var code = '<script async src="' + location.origin + '/widget.js?key=YOUR_KEY"><\/script>';
+  var code = '<script async src="' + location.origin + '/qz.js?YOUR_LOADER_TOKEN"><\/script>';
   var copyBtn = document.getElementById('copy-code');
   if (copyBtn) {
     copyBtn.addEventListener('click', function () {

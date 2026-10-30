@@ -49,6 +49,8 @@ function publicUser(user) {
     name: user.name,
     email: user.email,
     role: user.role,
+    account_id: user.account_id,
+    phone: user.phone || null,
     avatar: user.avatar,
     permissions: json(user.permissions, []),
     last_login_at: user.last_login_at
@@ -64,21 +66,51 @@ function tenantPublic(tenant) {
     brand_color: tenant.brand_color,
     hide_branding: !!tenant.hide_branding,
     custom_domain: tenant.custom_domain,
+    plan_status: tenant.plan_status || 'active',
+    trial_started_at: tenant.trial_started_at,
     trial_ends_at: tenant.trial_ends_at
   };
 }
 
-function sitePublic(site, plan) {
+function publicBase(req) {
+  const configured = String(process.env.PUBLIC_BASE || '').trim();
+  if (configured) return configured.replace(/\/+$/, '');
+  if (!req) return '';
+  const headers = req.headers || {};
+  function schemeOf(value) {
+    try { return new URL(String(value)).protocol.replace(':', ''); } catch (e) { return null; }
+  }
+  let proto = String(headers['x-forwarded-proto'] || '').split(',')[0].trim();
+  if (!proto) {
+    const forwarded = String(headers.forwarded || '');
+    const match = forwarded.match(/proto=(https?)/i);
+    if (match) proto = match[1].toLowerCase();
+  }
+  if (!proto && String(headers['x-forwarded-ssl'] || '').toLowerCase() === 'on') proto = 'https';
+  if (!['http', 'https'].includes(proto)) proto = req.secure ? 'https' : 'http';
+  // A browser request over HTTPS must never produce an HTTP embed URL, even if
+  // the reverse proxy omits or mislabels X-Forwarded-Proto.
+  const browserProto = schemeOf(headers.origin) || schemeOf(headers.referer);
+  if (browserProto === 'https' || (browserProto === 'http' && proto !== 'https')) proto = browserProto;
+  const host = String(headers['x-forwarded-host'] || req.get('host') || headers.host || '').split(',')[0].trim();
+  const prefix = String(headers['x-forwarded-prefix'] || '').trim().replace(/\/+$/, '');
+  return host ? `${proto}://${host}${prefix}` : '';
+}
+
+function sitePublic(site, plan, base) {
   const config = json(site.widget_config, {});
   return {
     id: site.id,
     name: site.name,
     domain: site.domain,
     site_key: site.site_key,
+    is_sandbox: !!site.is_sandbox,
+    installed_at: site.installed_at || null,
+    last_widget_ping_at: site.last_widget_ping_at || null,
     tracking_enabled: !!site.tracking_enabled,
     compliance_enabled: !!site.compliance_enabled,
     widget_config: config,
-    embed_code: `<script async src="${process.env.PUBLIC_BASE || ''}/widget.js?key=${site.site_key}"></script>`
+    embed_code: `<script async src="${base || publicBase()}/qz.js?${site.loader_token}"></script>`
   };
 }
 
@@ -110,6 +142,6 @@ function recalcVisitorIntent(tenantId, visitorId) {
 }
 
 module.exports = {
-  parseRange, siteScope, paging, siteFilterSql, dateFilterSql,
+  parseRange, siteScope, paging, siteFilterSql, dateFilterSql, publicBase,
   publicUser, tenantPublic, sitePublic, audit, recalcVisitorIntent, whereTenant
 };

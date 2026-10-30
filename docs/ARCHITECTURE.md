@@ -5,12 +5,14 @@
 ```mermaid
 graph LR
     Host["客户网站"] -->|"一段 script 异步加载"| Loader["widget.js 加载器"]
-    Loader -->|"空闲加载"| Core["widget-core.js"]
+    Loader -->|"空闲加载"| Core["qz-core.js"]
     Core -->|"REST 追踪 / 表单 / 上传"| API["Express API"]
     Core <-->|"WebSocket"| IO["Socket.IO"]
-    Admin["管理后台 SPA"] -->|"REST + Token"| API
+    Admin["客户管理后台 SPA"] -->|"REST + Token"| API
     Admin <-->|"WebSocket"| IO
-    Landing["产品落地页"] -->|"试用申请"| API
+    Signup["自助注册 /signup"] -->|"验证码 + 注册"| API
+    Ops["平台运营后台 /ops"] -->|"独立运营 Token"| API
+    Landing["产品落地页"] -->|"团队申请"| API
     API --> DB["SQLite WAL"]
     IO --> DB
     API --> Files["uploads/"]
@@ -25,7 +27,15 @@ graph LR
 | --- | --- | --- |
 | 入口 | `server/index.js` | 安全头、JSON、静态资源、路由、错误处理、Socket.IO |
 | 数据 | `server/db.js` + `schema.sql` | 建表、查询封装、事务 |
-| 认证 | `server/auth.js` | scrypt、HMAC Token、角色校验、特性门禁、API Key |
+| 认证 | `server/auth.js` | scrypt、HMAC Token、客户 RBAC、平台运营 RBAC、特性门禁、API Key |
+| 注册 | `routes/signup.js` | 短信验证码、账号创建、14 天试用；站点由客户登录后添加 |
+| 引导 | `routes/onboarding.js` | 安装检测、首条会话、首条线索与激活进度 |
+| 运营 | `routes/ops.js` | 平台账号、工作空间、申请线索、订单收入、支持工单、风控、审计 |
+| 订阅 | `services/billing.js` + `routes/payments.js` | 订单计价、模拟支付、回调验签、幂等开通、续费与降级 |
+| 工单 | `routes/support.js` | 客户提交、追加回复、关闭工单；运营后台回复与状态流转 |
+| PQL | `services/pql.js` | 安装、访客、会话、线索与团队成员阈值自动生成销售线索 |
+| 开通 | `services/provision.js` | 账号 + 工作空间 + 可选站点的事务化开通 |
+| 生命周期 | `services/lifecycle.js` | 试用到期降级免费版并保留数据 |
 | 公开 | `routes/public.js` | 访客配置、会话、追踪、触发、表单、离线留言、评价、录屏、上传、广告拦截 |
 | 实时 | `socket.js` | 访客与客服双向消息、抢单、转接、备注、输入预览、关闭与摘要 |
 | 会话 | `routes/conversations.js` | 列表、详情、筛选、状态与标签 |
@@ -35,7 +45,7 @@ graph LR
 | 配置 | `routes/config.js` | 站点、挂件、表单、规则、知识库、公告、黑名单、话术、标签、录屏 |
 | 系统 | `routes/settings.js` | 团队、品牌、套餐、API Key、通知渠道、日志、AI |
 | 开放 API | `routes/external.js` | 企业版 `x-api-key` 接口 |
-| 落地页 | `routes/landing.js` | 套餐、健康检查、试用申请 |
+| 落地页 | `routes/landing.js` | 套餐、健康检查、团队申请（进入平台线索池） |
 
 ## 3. 数据库设计
 
@@ -45,11 +55,21 @@ graph LR
 
 | 表 | 关键字段 | 说明 |
 | --- | --- | --- |
-| `tenants` | plan, status, brand_name, hide_branding, custom_domain | 套餐、白标、停用 |
-| `users` | tenant_id, email, password_hash, role, status | RBAC：admin/operator/agent |
-| `sites` | tenant_id, site_key, widget_config, tracking_enabled, compliance_enabled | 多站点与挂件配置 |
+| `accounts` | phone, email, password_hash, status, signup_source, signup_ip, risk_score | 登录身份，支持手机号/邮箱 |
+| `tenants` | name, plan, plan_status, trial_*, signup_source, risk_score, onboarding_state | 工作空间、套餐、试用与激活状态 |
+| `users` | tenant_id, account_id, email, phone, role, status | 账号在工作空间内的成员关系与 RBAC |
+| `sites` | tenant_id, site_key, loader_token, installed_at, last_widget_ping_at | 客户网站、加载令牌与安装检测 |
+| `platform_users` | email, password_hash, role | 平台运营独立账号 |
+| `applications` | phone, company, status, owner_id, tenant_id, account_id | 平台销售线索池 |
+| `application_activities` | application_id, platform_user_id, content | 销售跟进时间线 |
+| `sms_codes` | phone, code_hash, expires_at, attempts | 注册验证码 |
+| `platform_audit_logs` | platform_user_id, action, target, detail, ip | 平台运营审计 |
+| `orders` | order_no, tenant_id, plan, cycle, amount_cents, status, provider, invoice_no | 自助订单与发票记录 |
+| `payment_events` | event_id, order_id, amount_cents, status, raw | 支付回调幂等与审计 |
+| `support_tickets` | tenant_id, subject, category, priority, status | 客户支持工单 |
+| `ticket_messages` | ticket_id, sender_type, sender_id, content | 工单对话 |
 | `api_keys` | tenant_id, key, enabled | 企业版开放 API |
-| `audit_logs` | tenant_id, user_id, action, target, ip | 审计 |
+| `audit_logs` | tenant_id, user_id, action, target, ip | 客户侧审计 |
 
 ### 3.2 访客与行为
 
@@ -96,6 +116,18 @@ graph LR
 | `notifications` | 站内通知 |
 | `tags` | 访客标签字典 |
 
+
+### 3.6 账号、工作空间与双线运营
+
+账号与工作空间分离：`accounts` 是登录身份，`users` 是账号在某个 `tenant` 内的成员关系。一个人可以加入多个工作空间，登录返回默认工作空间，并可通过 `/api/auth/switch` 切换。
+
+平台运营数据与客户数据分域：
+
+- 客户后台 `/admin/` 只看到自己工作空间内的会话、访客、客户自己的线索、报表与配置。
+- 平台运营后台 `/ops/` 管理注册账号、工作空间、试用/订阅、申请线索、风控与平台成员。
+- 申请表单进入 `applications`，不写入任何客户的 `leads`。
+- 平台 Token 使用独立 `realm=ops`，不能访问客户接口；客户 Token 也不能访问运营接口。
+
 ## 4. 关键流程
 
 ### 4.1 挂件加载
@@ -104,7 +136,7 @@ graph LR
 sequenceDiagram
     participant Host as 客户网站
     participant Loader as widget.js
-    participant Core as widget-core.js
+    participant Core as qz-core.js
     participant API as 服务端
     Host->>Loader: 异步 script
     Loader->>Loader: 广告拦截检测
@@ -115,15 +147,16 @@ sequenceDiagram
     Core->>Host: Shadow DOM 注入挂件
 ```
 
-首屏只承担约 4KB 加载器。Socket.IO 客户端进一步延迟到访客首次打开会话。
+首屏只承担约 4KB 加载器。每个站点有独立的 32 位十六进制 `loader_token`，嵌入地址形如 `/qz.js?<token>`，不暴露 `key` 查询参数。服务端按令牌注入 Site Key，再从加载器自己的 `script.src` 推导插件基址，因此嵌入代码必须是绝对 URL；后台根据请求的 `Host`、`X-Forwarded-Proto`、`X-Forwarded-Host`、`X-Forwarded-Prefix` 生成，也可用 `PUBLIC_BASE` 覆盖。`/api/public/*` 返回跨域头，客户网站可以从其他域名直接访问。
 
-### 4.2 追踪与合规
+`/qz.js` 与 `/qz-core.js` 只接受脚本上下文：`Sec-Fetch-Dest=script`，或在没有该头时要求存在 `Referer`。直接打开返回 404。加载器除首行版权头外不包含注释。Socket.IO 客户端进一步延迟到访客首次打开会话。
 
-1. 首次访问展示隐私提示（站点开启时）
-2. 同意 → `/api/public/consent` 写入 1 → 启动会话与页面浏览上报
-3. 拒绝 → 写入 0 → 停止轨迹、点击、来源上报；仍可创建匿名身份进行聊天
-4. 站点 `tracking_enabled=0` → 服务端直接拒绝详细追踪入库
-5. 会话始终可初始化：挂件在追踪关闭时调用轻量 `/session` 只建立身份，不采集轨迹
+### 4.2 追踪控制
+
+1. 挂件加载后自动启动会话与页面追踪，不再展示隐私提示条。
+2. 站点 `tracking_enabled=0` → 服务端直接拒绝详细追踪入库。
+3. 会话始终可初始化：挂件在追踪关闭时调用轻量 `/session` 只建立身份，不采集轨迹。
+4. 隐私提示与访客同意流程暂不启用，等产品稳定后再作为独立能力接入。
 
 ### 4.3 触发规则
 
@@ -137,13 +170,85 @@ sequenceDiagram
 - 私有备注只广播到 `tenant:*` 房间，不进入 `conv:*`
 - 关闭会话：企业版生成 AI 摘要、需求、建议与自动标签
 
+### 4.5 自助注册与激活
+
+```mermaid
+sequenceDiagram
+    participant U as 个人站长
+    participant S as /signup
+    participant API as 服务端
+    participant W as 工作空间
+    U->>S: 手机号 + 验证码 + 密码
+    S->>API: POST /api/signup/send-code
+    API-->>S: 5 分钟验证码（开发环境返回演示码）
+    S->>API: POST /api/signup/register
+    API->>W: 创建账号 + 工作空间（不自动建站）
+    API-->>S: Token + 试用信息
+    S->>U: 跳转 /admin/#/onboarding
+    U->>W: 在站点管理添加自己的网站
+    W-->>U: Site Key + 一段 JS
+    U->>W: 复制 JS 到真实网站
+    W->>API: GET /api/public/config
+    API->>W: 写入 installed_at
+```
+
+激活判定是“添加网站、安装 JS 后收到首条会话”。注册只负责账号，站点由客户在后台自行添加。
+
+### 4.6 销售申请转工作空间
+
+1. 落地页团队表单写入 `applications`，状态 `new`。
+2. 运营后台分配销售、记录跟进、修改状态。
+3. 点击“转为工作空间”后，按手机号/邮箱复用或创建账号，再创建工作空间；客户登录后添加自己的网站。
+4. 新账号返回一次性临时密码；已有账号直接增加成员关系。
+5. 申请记录关联 `tenant_id` 与 `account_id`，状态改为 `won`。
+
+### 4.7 自助订阅与支付回调
+
+```mermaid
+sequenceDiagram
+    participant U as 管理员
+    participant A as 客户后台
+    participant API as 服务端
+    participant P as 支付渠道
+    U->>A: 选择套餐与月付/年付
+    A->>API: POST /api/billing/orders
+    API-->>A: 订单号 + 服务端计算金额
+    alt 开发环境 mock
+      A->>API: POST /api/billing/orders/:id/pay
+    else 生产环境
+      A->>P: 展示二维码/支付链接
+      P->>API: POST /api/public/payments/webhook/:provider
+      API->>API: HMAC 验签 + event_id 幂等 + 金额校验
+    end
+    API->>API: 订单 paid + 套餐生效 + 周期计算 + 发票号
+    API-->>U: 套餐、周期与发票记录
+```
+
+订单金额只由服务端按 `plans.js` 计算，客户端传价格无效。已支付订单生成 `invoice_no`；到期未续费先进入 7 天宽限期（`past_due`），仍未续费则降级免费版；取消续费会在当前周期结束后直接降级。
+
+### 4.8 PQL 自动转销售
+
+生命周期任务每小时检查已安装 JS 的工作空间：访客数 ≥ 50，且会话 ≥ 5 或线索 ≥ 2 时，生成 `applications.source='pql'` 的销售线索，按未关闭线索数分配给销售。30 天内已有未关闭 PQL 时不重复创建。
+
+### 4.9 支持工单
+
+1. 客户后台提交工单，写入 `support_tickets` 与首条 `ticket_messages`。
+2. 平台运营在 `/ops/` 回复；状态变为 `pending`，客户收到站内通知。
+3. 客户追加回复后状态回到 `open`。
+4. 双方可标记已解决/关闭；运营可调整优先级。
+
 ## 5. REST 接口规划
 
 ### 5.1 公开接口
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/public/config` | 挂件配置与套餐能力 |
+| POST | `/api/signup/send-code` | 发送注册验证码 |
+| POST | `/api/signup/register` | 注册并创建工作空间（不自动建站） |
+| GET | `/qz.js?<token>` | 按站点令牌返回加载器，仅允许脚本上下文 |
+| GET | `/qz-core.js` | 挂件内核，仅允许脚本上下文 |
+| GET | `/api/public/config` | 挂件配置与套餐能力；正式站点自动记录安装时间 |
+| POST | `/api/public/payments/webhook/:provider` | 支付回调，HMAC 验签、金额校验与 event_id 幂等 |
 | POST | `/api/public/session` | 访客身份与会话 |
 | POST | `/api/public/track` | 页面、停留、点击、滚动、广告拦截 |
 | POST | `/api/public/trigger-check` | 触发规则校验 |
@@ -152,11 +257,43 @@ sequenceDiagram
 | POST | `/api/public/rating` | 满意度 |
 | POST | `/api/public/upload` | 访客附件 |
 | POST | `/api/public/recording` | 访客录屏 |
-| POST | `/api/public/consent` | 同意/拒绝追踪 |
 | POST | `/api/public/blacklist-check` | 黑名单校验 |
 | POST | `/api/public/adblock` | 拦截上报 |
 
-### 5.2 后台接口
+### 5.2 运营接口
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/api/ops/auth/login` | 平台运营登录 |
+| GET | `/api/ops/overview` | 注册、激活、试用、申请与风险指标 |
+| GET/PATCH | `/api/ops/accounts` | 客户账号检索、停用与风险标记 |
+| GET/PATCH | `/api/ops/workspaces` | 工作空间、套餐、试用与停用 |
+| GET/PATCH | `/api/ops/applications` | 申请线索、状态、负责人与跟进 |
+| POST | `/api/ops/applications/:id/convert` | 申请转工作空间 |
+| GET | `/api/ops/subscriptions` | 套餐分布、试用与临期 |
+| GET | `/api/ops/risk` | 高风险账号、工作空间与同 IP 注册 |
+| GET/POST/PATCH | `/api/ops/team` | 平台成员管理（超级管理员） |
+| GET | `/api/ops/audit-logs` | 平台操作审计 |
+
+### 5.3 订阅与工单
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/billing` | 套餐、用量、订阅、订单与发票 |
+| POST | `/api/billing/orders` | 创建订单（服务端计价） |
+| POST | `/api/billing/orders/:id/pay` | 开发环境模拟支付 |
+| POST | `/api/billing/orders/:id/cancel` | 取消待支付订单 |
+| POST | `/api/billing/downgrade` | 降级免费版或预约到期降级 |
+| POST | `/api/billing/resume` | 取消到期降级设置 |
+| POST | `/api/billing/contact-sales` | 企业版/定制咨询转销售线索 |
+| GET/POST | `/api/support/tickets` | 客户工单列表与新建 |
+| GET | `/api/support/tickets/:id` | 工单详情与消息 |
+| POST | `/api/support/tickets/:id/messages` | 客户追加回复 |
+| PATCH | `/api/support/tickets/:id` | 标记解决/关闭 |
+| GET/PATCH | `/api/ops/tickets` | 运营工单列表、状态与优先级 |
+| POST | `/api/ops/tickets/:id/messages` | 运营回复工单 |
+
+### 5.4 后台接口
 
 | 分组 | 代表路径 |
 | --- | --- |
@@ -213,7 +350,7 @@ sequenceDiagram
 | 恶意内容 | 敏感词规则拦截并记录，不上屏 |
 | 爬虫/骚扰 | IP 与访客 ID 黑名单，JS 端不渲染 |
 | 文件风险 | 扩展名白名单、随机文件名、单文件大小限制 |
-| 数据过度采集 | 站点级追踪总开关 + 访客拒绝 + 隐私提示 |
+| 数据过度采集 | 站点级追踪总开关，隐私提示能力暂缓启用 |
 | 审计 | 登录、配置变更、导出、成员管理写审计日志 |
 | 上传目录 | 静态目录相互独立，禁止执行脚本 |
 

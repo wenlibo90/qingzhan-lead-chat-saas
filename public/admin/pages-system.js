@@ -72,60 +72,161 @@
 
   // ---------------- billing ----------------
   A.registerPage('billing', {
-    title: '套餐与用量', subtitle: '功能版本与额度管理',
+    title: '套餐与用量', subtitle: '订阅、订单与额度管理',
     roles: ['admin'],
     render: function (root) {
-      root.innerHTML = '<div class="page-head"><div><h1>套餐与用量</h1><p>功能按版本锁定，升级立即生效。</p></div></div><div id="billing-body">' + A.skeleton(4) + '</div>';
+      root.innerHTML = '<div class="page-head"><div><h1>套餐与用量</h1><p>自助升级按订单支付；企业版和定制需求可直接转给销售。</p></div></div><div id="billing-body">' + A.skeleton(4) + '</div>';
       A.api('/api/billing').then(function (d) {
         var plan = d.plan;
         var usage = d.usage;
+        var sub = d.subscription || {};
         var limits = plan.limits;
+        var isTrial = sub.plan_status === 'trialing';
+        var trialLeft = A.trialDaysLeft();
+        var periodEnd = sub.current_period_end ? String(sub.current_period_end).slice(0, 10) : '';
         function usageRow(label, used, limit) {
           var pct = limit === -1 ? 10 : Math.min(100, (used / Math.max(1, limit)) * 100);
           return '<div class="usage-row"><span class="u-label">' + label + '</span><span class="u-track"><span class="u-fill" style="width:' + pct + '%"></span></span><span class="u-val">' + used + (limit === -1 ? ' / 不限' : ' / ' + limit) + '</span></div>';
         }
+        var planRank = { free: 0, standard: 1, pro: 2, enterprise: 3 };
+        function planButton(p) {
+          if (p.code === plan.code && p.code === 'free') return '<button class="au-btn au-btn--ghost" style="width:100%" disabled>当前套餐</button>';
+          if (p.code !== 'free' && !isTrial && sub.plan_status === 'active' && planRank[p.code] < planRank[plan.code]) {
+            return '<button class="au-btn au-btn--ghost" style="width:100%" disabled>当前周期内保留更高套餐</button>';
+          }
+          if (p.code === plan.code && !isTrial && sub.plan_status === 'active') {
+            if (p.code === 'enterprise') return '<button class="au-btn au-btn--ghost" style="width:100%" disabled>当前套餐</button>';
+            return '<button class="au-btn au-btn--primary" style="width:100%" data-buy="' + p.code + '">续费当前套餐</button>';
+          }
+          if (p.code === plan.code && isTrial) return '<button class="au-btn au-btn--primary" style="width:100%" data-buy="' + p.code + '">转为付费' + p.name + '</button>';
+          if (p.code === 'free') return '<button class="au-btn au-btn--ghost" style="width:100%" data-downgrade>降级到免费版</button>';
+          if (p.code === 'enterprise') return '<button class="au-btn au-btn--ghost" style="width:100%" data-enterprise>联系销售</button>';
+          return '<button class="au-btn au-btn--primary" style="width:100%" data-buy="' + p.code + '">升级到' + p.name + '</button>';
+        }
         var planCards = d.plans.map(function (p) {
           return '<div class="plan-card' + (p.recommended ? ' recommended' : '') + (p.code === plan.code ? ' current' : '') + '">' +
             (p.recommended ? '<span class="pill purple" style="position:absolute;right:12px;top:12px">主推</span>' : '') +
-            '<h3>' + p.name + '</h3><div class="price">' + (p.code === 'free' ? '¥0' : p.price ? '¥' + p.price : '定制') + (p.price ? '<small> / 月</small>' : '') + '</div><div class="tagline">' + A.esc(p.tagline) + '</div>' +
+            '<h3>' + p.name + '</h3><div class="price">' + (p.code === 'free' ? '¥0' : p.price ? '¥' + p.price : '定制') + (p.price ? '<small> / 月</small>' : '') + '</div>' +
+            (p.yearly ? '<div class="tiny muted" style="margin-top:-2px">年付 ¥' + p.yearly + '</div>' : '') +
+            '<div class="tagline">' + A.esc(p.tagline) + '</div>' +
             '<ul>' + p.highlights.map(function (h) { return '<li>' + A.icon('check', 12) + A.esc(h) + '</li>'; }).join('') + '</ul>' +
-            '<button class="au-btn ' + (p.code === plan.code ? 'au-btn--ghost' : 'au-btn--primary') + '" style="width:100%" data-plan="' + p.code + '"' + (p.code === plan.code ? ' disabled' : '') + '>' + (p.code === plan.code ? '当前套餐' : p.code === 'enterprise' ? '联系销售' : '切换体验') + '</button></div>';
+            planButton(p) + '</div>';
         }).join('');
-        var rows = d.plans.map(function (p) { return { code: p.code, name: p.name, features: p.features }; });
-        var allFeatures = Object.keys(A.data.featureMap || {});
-        var featureMap = {};
-        d.plans.forEach(function (p) { featureMap[p.code] = p.features; });
         var compareFeatures = [
           ['chat', '在线客服对话'], ['triggers', '主动触发弹窗'], ['forms', '自定义表单'], ['knowledge', '自助知识库'], ['recording', '访客录屏'],
           ['funnel', '转化漏斗'], ['intent_scoring', '意向自动打分'], ['crm', '轻线索 CRM'], ['geo_heatmap', '区域热力图'], ['automation', '自动化规则引擎'],
           ['ai_bot', 'AI 接待机器人'], ['translation', '多语言翻译'], ['whitelabel', '白标与自定义域名'], ['api', '开放 API'], ['sla', 'SLA 支持']
         ];
+        var statusText = isTrial ? '试用中' : sub.plan_status === 'active' ? '正常' : sub.plan_status === 'expired' ? '已过期' : sub.plan_status;
+        var statusPill = isTrial ? 'orange' : sub.plan_status === 'active' ? 'green' : sub.plan_status === 'past_due' ? 'red' : 'gray';
+        var periodLine = isTrial
+          ? '试用剩余 ' + (trialLeft == null ? '-' : trialLeft + ' 天') + ' · 到期 ' + (sub.trial_ends_at ? String(sub.trial_ends_at).slice(0, 10) : '-')
+          : periodEnd ? (sub.plan_status === 'past_due' ? '已到期，7 天宽限期内可续费 · ' : '当前周期至 ') + periodEnd + ' · ' + (sub.billing_cycle === 'yearly' ? '年付' : '月付') : plan.code === 'free' ? '免费版不设到期时间' : '当前为销售开通或演示套餐，未记录订阅周期';
+        var pastDueNotice = sub.plan_status === 'past_due' ? '<div class="notice danger mt-2">' + A.icon('alert', 14) + '<span>订阅已到期，套餐能力保留 7 天宽限期。请尽快续费，避免降级免费版。</span></div>' : '';
+        var cancelNotice = sub.cancel_at_period_end ? '<div class="notice warn mt-2">' + A.icon('alert', 14) + '<span>已设置到期降级免费版。' + (periodEnd ? '当前周期至 ' + periodEnd + '。' : '') + ' <button class="au-btn au-btn--ghost au-btn--xs" data-resume>恢复订阅</button></span></div>' : '';
+        var orderRows = (d.orders || []).map(function (o) {
+          var st = { pending: '待支付', paid: '已支付', failed: '支付失败', canceled: '已取消', refunded: '已退款' }[o.status] || o.status;
+          var cls = o.status === 'paid' ? 'green' : o.status === 'pending' ? 'orange' : 'gray';
+          return '<tr><td class="mono" style="font-size:10px">' + A.esc(o.order_no) + '</td><td>' + A.planName(o.plan) + '</td><td>' + (o.cycle === 'yearly' ? '年付' : '月付') + '</td><td>' + A.fmtMoney(o.amount) + '</td><td><span class="pill ' + cls + '">' + st + '</span></td><td class="tiny muted">' + A.fmtTime(o.created_at) + '</td><td>' + (o.status === 'pending' ? '<button class="au-btn au-btn--ghost au-btn--xs" data-pay-order="' + o.id + '">去支付</button>' : o.invoice_no ? '<span class="tiny mono">' + A.esc(o.invoice_no) + '</span>' : '-') + '</td></tr>';
+        }).join('');
+        var invoiceRows = (d.invoices || []).map(function (i) {
+          return '<div class="side-kv"><span>' + A.esc(i.id) + ' · ' + i.date + '</span><b>' + A.fmtMoney(i.amount) + ' <span class="pill green">已开票</span></b></div>';
+        }).join('');
         root.querySelector('#billing-body').innerHTML =
-          '<div class="grid g-2-1 section-gap"><div class="az-card pad"><div class="flex items-center justify-between"><div><div class="tiny muted">当前套餐</div><h2 style="margin:3px 0;font-size:22px">' + plan.name + '</h2><div class="tiny muted">' + A.esc(plan.tagline) + '</div></div><span class="pill ' + (plan.code === 'pro' ? 'purple' : 'blue') + '">' + (plan.price ? '¥' + plan.price + ' / 月' : '定制报价') + '</span></div>' +
+          '<div class="grid g-2-1 section-gap"><div class="az-card pad"><div class="flex items-center justify-between"><div><div class="tiny muted">当前套餐</div><h2 style="margin:3px 0;font-size:22px">' + plan.name + ' <span class="pill ' + statusPill + '" style="font-size:10px;vertical-align:middle">' + statusText + '</span></h2><div class="tiny muted">' + A.esc(periodLine) + '</div></div><span class="pill ' + (plan.code === 'pro' ? 'purple' : 'blue') + '">' + (plan.price ? '¥' + plan.price + ' / 月' : plan.code === 'enterprise' ? '定制报价' : '免费') + '</span></div>' +
+          (isTrial ? '<div class="notice warn mt-2">' + A.icon('clock', 14) + '<span>专业版试用剩余 <b>' + trialLeft + '</b> 天，到期自动降级免费版，数据保留。</span></div>' : '') + pastDueNotice + cancelNotice +
           '<div class="divider"></div>' + usageRow('客服坐席', usage.agents, limits.agents) + usageRow('站点数量', usage.sites, limits.sites) + usageRow('本月访客', usage.monthlyVisitors, limits.visitors_monthly) + usageRow('附件存储', usage.storageMb + ' MB', -1) +
-          '<div class="notice info mt-2">' + A.icon('card', 14) + '<span>套餐切换为演示能力，正式环境会跳转支付。年付按 10 个月计费。</span></div></div>' +
+          '<div class="notice info mt-2">' + A.icon('card', 14) + '<span>' + A.esc(d.payment.message) + '</span></div></div>' +
           '<div class="az-card pad"><h4 style="margin:0 0 10px;font-size:13px">当前已解锁能力</h4><div class="tag-list">' + plan.featuresDetail.map(function (f) { return '<span class="pill blue">' + A.esc(f) + '</span>'; }).join('') + '</div>' +
-          '<div class="divider"></div><h4 style="margin:0 0 8px;font-size:13px">发票记录</h4>' + (d.invoices.length ? d.invoices.map(function (i) { return '<div class="side-kv"><span>' + i.id + ' · ' + i.date + '</span><b>' + A.fmtMoney(i.amount) + ' <span class="pill green">已支付</span></b></div>'; }).join('') : '<div class="tiny muted">免费版暂无发票</div>') + '</div></div>' +
+          '<div class="divider"></div><h4 style="margin:0 0 8px;font-size:13px">发票记录</h4>' + (invoiceRows || '<div class="tiny muted">暂无已支付订单</div>') + '</div></div>' +
           '<div class="plan-grid section-gap">' + planCards + '</div>' +
+          '<div class="az-card section-gap"><div class="az-card-head"><div><h3>订单记录</h3><div class="sub">支付回调验签、金额服务端校验、幂等处理</div></div></div><div class="az-card-body flush"><div class="table-wrap"><table class="az-table"><thead><tr><th>订单号</th><th>套餐</th><th>周期</th><th>金额</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead><tbody>' + (orderRows || '<tr><td colspan="7"><div class="empty-state" style="padding:24px"><p>暂无订单</p></div></td></tr>') + '</tbody></table></div></div></div>' +
           '<div class="az-card"><div class="az-card-head"><h3>功能对比</h3><div class="sub">按版本锁定，未开通能力在后台置灰</div></div><div class="az-card-body flush"><div class="table-wrap"><table class="az-table"><thead><tr><th>能力</th>' + d.plans.map(function (p) { return '<th>' + p.name + '</th>'; }).join('') + '</tr></thead><tbody>' +
           compareFeatures.map(function (f) {
             return '<tr><td><b style="font-size:12px">' + f[1] + '</b></td>' + d.plans.map(function (p) {
               return '<td>' + (p.features.indexOf(f[0]) > -1 ? '<span style="color:#10b981">' + A.icon('check', 14) + '</span>' : '<span class="muted">-</span>') + '</td>';
             }).join('') + '</tr>';
           }).join('') + '</tbody></table></div></div></div>';
-        A.$$('[data-plan]', root).forEach(function (b) {
-          b.onclick = function () {
-            var code = b.getAttribute('data-plan');
-            if (code === 'enterprise') return A.toast('已记录需求，销售会在 1 个工作日内联系你', 'ok');
-            A.confirm({ title: '切换套餐', message: '切换为' + A.planName(code) + '后立即生效（演示环境）。', okText: '确认切换' }).then(function (ok) {
-              if (!ok) return;
-              A.apiPost('/api/billing/change-plan', { plan: code }).then(function () { A.toast('已切换为' + A.planName(code), 'ok'); A.boot(); }).catch(A.handleError);
-            });
-          };
+
+        A.$$('[data-buy]', root).forEach(function (b) {
+          b.onclick = function () { openOrder(b.getAttribute('data-buy'), d); };
         });
+        A.$$('[data-pay-order]', root).forEach(function (b) {
+          b.onclick = function () { openPayment((d.orders || []).filter(function (o) { return String(o.id) === b.getAttribute('data-pay-order'); })[0], d); };
+        });
+        var down = root.querySelector('[data-downgrade]');
+        if (down) down.onclick = function () {
+          A.confirm({ title: '降级到免费版', message: '立即降级会失去专业版能力，数据保留。付费周期内降级会安排在当前周期结束后生效。', okText: '确认降级', danger: true }).then(function (ok) {
+            if (!ok) return;
+            A.apiPost('/api/billing/downgrade', {}).then(function () { A.toast('降级已安排', 'ok'); A.boot(); }).catch(A.handleError);
+          });
+        };
+        var ent = root.querySelector('[data-enterprise]');
+        if (ent) ent.onclick = function () {
+          A.apiPost('/api/billing/contact-sales', { message: '客户在套餐页咨询企业版。' }).then(function () { A.toast('已转给销售，会在 1 个工作日内联系你', 'ok'); }).catch(A.handleError);
+        };
+        var resume = root.querySelector('[data-resume]');
+        if (resume) resume.onclick = function () {
+          A.apiPost('/api/billing/resume', {}).then(function () { A.toast('已恢复订阅', 'ok'); A.route(); }).catch(A.handleError);
+        };
       }).catch(function (e) { A.handleError(e); });
     }
   });
+
+  function openOrder(planCode, d) {
+    var plan = d.plans.filter(function (p) { return p.code === planCode; })[0];
+    if (!plan) return;
+    var savedCycle = 'monthly';
+    var m = A.modal({
+      title: '开通' + plan.name,
+      subtitle: '订单金额由服务端按套餐价格计算，前端不传价格',
+      body: '<div class="plan-order"><div><label class="field-label">计费周期</label><div class="cycle-switch"><button class="au-chip active" data-cycle="monthly">月付 ¥' + plan.price + '</button><button class="au-chip" data-cycle="yearly">年付 ¥' + plan.yearly + ' <span style="font-size:9px;opacity:.7">省 2 个月</span></button></div></div>' +
+        '<div class="order-summary"><div class="side-kv"><span>套餐</span><b>' + plan.name + '</b></div><div class="side-kv"><span>周期</span><b data-cycle-label>月付</b></div><div class="side-kv total"><span>应付</span><b data-amount>¥' + plan.price + '</b></div></div>' +
+        '<div class="tiny muted">支付成功后立即生效；年付按 10 个月计费。企业版与定制需求请联系销售。</div></div>',
+      footer: [{ label: '取消', class: 'au-btn--ghost' }, { label: '创建订单', class: 'au-btn--primary', onClick: function (card, close) {
+        var btn = card.querySelectorAll('.modal-foot .au-btn')[1];
+        btn.disabled = true;
+        btn.textContent = '创建中...';
+        A.apiPost('/api/billing/orders', { plan: planCode, cycle: savedCycle }).then(function (r) {
+          close();
+          openPayment(r.order, d, r.payment);
+        }).catch(function (e) { btn.disabled = false; btn.textContent = '创建订单'; A.handleError(e); });
+      } }]
+    });
+    function pick(cycle) {
+      savedCycle = cycle;
+      A.$$('[data-cycle]', m.el).forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-cycle') === cycle); });
+      m.el.querySelector('[data-cycle-label]').textContent = cycle === 'yearly' ? '年付' : '月付';
+      m.el.querySelector('[data-amount]').textContent = '¥' + (cycle === 'yearly' ? plan.yearly : plan.price);
+    }
+    A.$$('[data-cycle]', m.el).forEach(function (b) { b.onclick = function () { pick(b.getAttribute('data-cycle')); }; });
+  }
+
+  function openPayment(order, d, payment) {
+    if (!order) return;
+    var pay = payment || (d && d.payment) || { mock: false, message: '支付通道未配置' };
+    var m = A.modal({
+      title: '支付订单',
+      subtitle: '订单号 ' + order.order_no,
+      body: '<div class="order-summary"><div class="side-kv"><span>套餐</span><b>' + A.planName(order.plan) + '</b></div><div class="side-kv"><span>周期</span><b>' + (order.cycle === 'yearly' ? '年付' : '月付') + '</b></div><div class="side-kv total"><span>应付</span><b>¥' + order.amount + '</b></div></div>' +
+        '<div class="notice ' + (pay.mock ? 'info' : 'warn') + ' mt-2">' + A.icon('card', 14) + '<span>' + A.esc(pay.message || (pay.mock ? '开发环境可模拟支付。' : '请配置支付渠道后使用。')) + '</span></div>' +
+        (order.status === 'paid' ? '<div class="notice ok mt-2">该订单已支付。</div>' : ''),
+      footer: order.status === 'paid' ? [{ label: '关闭', class: 'au-btn--ghost' }] : [
+        { label: '稍后支付', class: 'au-btn--ghost', onClick: function (card, close) { close(); A.route(); } },
+        { label: pay.mock ? '模拟支付完成' : '联系销售', class: 'au-btn--primary', onClick: function (card, close) {
+          if (!pay.mock) {
+            A.apiPost('/api/billing/contact-sales', { message: '客户需要协助完成支付。' }).then(function () { close(); A.toast('已转给销售', 'ok'); }).catch(A.handleError);
+            return;
+          }
+          A.apiPost('/api/billing/orders/' + order.id + '/pay', {}).then(function () {
+            close();
+            A.toast('支付成功，套餐已生效', 'ok');
+            A.boot();
+          }).catch(A.handleError);
+        } }
+      ]
+    });
+  }
 
   // ---------------- settings ----------------
   A.registerPage('settings', {
@@ -166,7 +267,7 @@
           '</div></div><div class="grid" style="gap:16px;align-content:start"><div class="az-card pad"><h4 style="margin:0 0 8px;font-size:13px">版本能力</h4>' +
           '<div class="side-kv"><span>当前套餐</span><b>' + A.state.plan.name + '</b></div><div class="side-kv"><span>白标</span><b>' + (d.licensed.whitelabel ? '已解锁' : '未开通') + '</b></div><div class="side-kv"><span>开放 API</span><b>' + (d.licensed.api ? '已解锁' : '未开通') + '</b></div>' +
           '<button class="au-btn au-btn--ghost au-btn--sm" style="width:100%;margin-top:10px" onclick="Admin.go(\'billing\')">查看套餐</button></div>' +
-          '<div class="az-card pad"><h4 style="margin:0 0 8px;font-size:13px">合规提示</h4><div class="tiny muted" style="line-height:1.9">行为采集总开关在「挂件配置 → 功能与合规」中按站点控制。访客拒绝追踪后仍可聊天，但不会记录页面轨迹。</div></div></div></div>';
+          '<div class="az-card pad"><h4 style="margin:0 0 8px;font-size:13px">行为采集</h4><div class="tiny muted" style="line-height:1.9">行为采集总开关在「挂件配置 → 能力开关」中按站点控制。关闭后停止新增页面轨迹、点击和来源数据，聊天与线索仍可正常使用。</div></div></div></div>';
         if (A.isAdmin()) {
           box.querySelector('[data-save-settings]').onclick = function () {
             var body = {};
