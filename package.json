@@ -1,0 +1,26 @@
+{
+  "name": "qingzhan-lead-chat",
+  "version": "1.0.0",
+  "private": true,
+  "description": "轻站线索客服 SaaS - 一段 JS 嵌入，客服 + 访客行为埋点 + 营销触达 + 轻线索 CRM 一体化",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node --no-warnings server/index.js",
+    "dev": "node --no-warnings --watch server/index.js",
+    "seed": "node --no-warnings server/seed.js",
+    "test": "node --no-warnings server/test/smoke.js",
+    "test:ui": "node --no-warnings server/test/ui.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.1",
+    "socket.io-client": "^4.8.4"
+  }
+}
