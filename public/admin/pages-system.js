@@ -20,7 +20,7 @@
           '<div class="metric-card"><div class="m-top"><span class="m-label">管理员</span><span class="m-ico purple">' + A.icon('shield', 14) + '</span></div><div class="m-value">' + d.users.filter(function (u) { return u.role === 'admin'; }).length + '</div><div class="m-sub">可管理配置与计费</div></div></div>' +
           '<div class="az-card"><div class="az-card-body flush"><div class="table-wrap"><table class="az-table"><thead><tr><th>成员</th><th>角色</th><th>接待会话</th><th>线索产出</th><th>最近登录</th><th>状态</th><th></th></tr></thead><tbody>' +
           d.users.map(function (u) {
-            return '<tr><td><div class="flex items-center gap-1"><span class="avatar-sm ' + (u.role === 'admin' ? 'purple' : u.role === 'operator' ? 'green' : '') + '">' + A.esc(u.name.slice(0, 1)) + '</span><div><div class="u-name">' + A.esc(u.name) + (u.id === A.state.user.id ? ' <span class="pill blue" style="font-size:9px">我</span>' : '') + '</div><div class="u-sub">' + A.esc(u.email) + '</div></div></div></td>' +
+            return '<tr><td><div class="flex items-center gap-1">' + A.avatarHtml(u, 'avatar-sm', 12) + '<div><div class="u-name">' + A.esc(u.name) + (u.id === A.state.user.id ? ' <span class="pill blue" style="font-size:9px">我</span>' : '') + '</div><div class="u-sub">' + A.esc(u.email) + '</div></div></div></td>' +
               '<td><span class="pill ' + (u.role === 'admin' ? 'purple' : u.role === 'operator' ? 'green' : 'blue') + '">' + ROLE[u.role] + '</span></td>' +
               '<td>' + u.conversations + '</td><td>' + u.leads + '</td><td class="tiny muted">' + (u.last_login_at ? A.timeAgo(u.last_login_at) : '从未登录') + '</td>' +
               '<td>' + (u.status === 'active' ? '<span class="pill green">正常</span>' : '<span class="pill gray">已停用</span>') + '</td>' +

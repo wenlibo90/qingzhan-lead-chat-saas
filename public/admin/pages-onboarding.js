@@ -30,7 +30,7 @@
         : '<button class="au-btn au-btn--primary" data-add-site>' + A.icon('globe', 14) + ' 添加我的网站</button>';
       var codeBlock = site
         ? '<div class="code-box">' + A.esc(embed) + '</div><div class="flex gap-1 mt-2"><button class="au-btn au-btn--primary au-btn--sm" data-copy>复制代码</button><a class="au-btn au-btn--ghost au-btn--sm" href="#/sites">网站接入设置</a></div>'
-        : '<div class="empty-state" style="padding:26px 16px"><div class="em-ico">' + A.icon('globe', 20) + '</div><b>先添加你的网站</b><p>添加后系统会生成 Site Key 和一段 JS。把代码放到你的网站，就能开始接收真实咨询。</p><button class="au-btn au-btn--primary au-btn--sm mt-2" data-add-site>添加网站</button></div>';
+        : '<div class="empty-state" style="padding:26px 16px"><div class="em-ico">' + A.icon('globe', 20) + '</div><b>先添加你的网站</b><p>添加后系统会生成加载令牌和一段 JS。把代码放到你的网站，就能开始接收真实咨询。</p><button class="au-btn au-btn--primary au-btn--sm mt-2" data-add-site>添加网站</button></div>';
       root.querySelector('#onboarding-body').innerHTML =
         '<div class="onboard-hero">' +
           '<div class="oh-left"><span class="kicker">SELF-SERVE ONBOARDING</span><h2>你好，' + A.esc(A.state.user.name) + '</h2><p>你的工作空间「' + A.esc(A.state.tenant.name) + '」已经开通。自助客户直接在自己的网站上跑真实场景，不需要额外演示站。</p>' +
@@ -49,7 +49,7 @@
           '<div class="grid" style="gap:16px;align-content:start">' +
             '<div class="az-card pad"><h4 style="margin:0 0 10px;font-size:13px">实时数据</h4>' +
               '<div class="oh-metrics"><div><b>' + d.counts.visitors + '</b><span>访客</span></div><div><b>' + d.counts.conversations + '</b><span>会话</span></div><div><b>' + d.counts.leads + '</b><span>线索</span></div></div>' +
-              '<div class="divider"></div><div class="side-kv"><span>正式站点</span><b>' + (site ? A.esc(site.name) : '未添加') + '</b></div><div class="side-kv"><span>Site Key</span><b class="mono" style="font-size:10px">' + (site ? A.esc(site.site_key) : '-') + '</b></div><div class="side-kv"><span>站点数量</span><b>' + d.site_count + '</b></div>' +
+              '<div class="divider"></div><div class="side-kv"><span>正式站点</span><b>' + (site ? A.esc(site.name) : '未添加') + '</b></div><div class="side-kv"><span>加载令牌</span><b class="mono" style="font-size:10px">' + (site ? A.esc(site.loader_token || '-') : '-') + '</b></div><div class="side-kv"><span>站点数量</span><b>' + d.site_count + '</b></div>' +
             '</div>' +
             '<div class="az-card pad"><h4 style="margin:0 0 10px;font-size:13px">接下来</h4><div class="tiny muted" style="line-height:1.9">· 在「站点管理」添加更多网站<br>· 在「挂件配置」修改欢迎语和配色<br>· 在「自动化规则」配置主动弹窗<br>· 在「团队与权限」邀请客服<br>· 在「线索 CRM」查看聊天产生的线索</div><div class="flex gap-1 mt-2 wrap"><button class="au-btn au-btn--ghost au-btn--xs" onclick="Admin.go(\'sites\')">站点管理</button><button class="au-btn au-btn--ghost au-btn--xs" onclick="Admin.go(\'widget\')">挂件配置</button><button class="au-btn au-btn--ghost au-btn--xs" onclick="Admin.go(\'team\')">邀请客服</button></div></div>' +
           '</div>' +

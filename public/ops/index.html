@@ -4,14 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
-  <title>轻站平台运营 · Ops Console</title>
+  <title>轻客服 SaaS · 平台运营</title>
   <link rel="stylesheet" href="/assets/apollo-ui.css">
   <link rel="stylesheet" href="/admin/styles.css">
   <link rel="stylesheet" href="/ops/ops.css">
+  <link rel="icon" type="image/webp" href="/assets/logo.webp">
 </head>
 <body>
   <div id="boot-screen" class="boot-screen"><div class="boot-logo">运</div><div class="boot-spinner"></div><p>正在加载运营控制台</p></div>
-  <div id="ops-login" class="ops-login" hidden></div>
+  <div id="ops-login" class="login-screen" hidden></div>
   <div id="ops-app" class="app-shell" hidden>
     <aside id="ops-sidebar" class="sidebar ops-sidebar"></aside>
     <div class="app-main">
@@ -25,6 +26,7 @@
   <script src="/ops/app.js"></script>
   <script src="/ops/pages.js"></script>
   <script src="/ops/pages-tickets.js"></script>
+  <script src="/ops/pages-referrals.js"></script>
   <script>Ops.boot();</script>
 </body>
 </html>

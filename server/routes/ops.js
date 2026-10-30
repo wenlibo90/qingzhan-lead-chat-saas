@@ -5,6 +5,7 @@ const { verifyPassword, hashPassword, signOpsToken, opsAuthRequired, requireOpsR
 const { PLANS, planOf } = require('../plans');
 const { createWorkspace } = require('../services/provision');
 const { notifyTenant } = require('../services/notify');
+const referral = require('../services/referral');
 const { hit } = require('../services/ratelimit');
 
 const router = express.Router();
@@ -397,6 +398,20 @@ router.post('/tickets/:id/messages', opsAuthRequired, requireOpsRole('superadmin
   await notifyTenant(ticket.tenant_id, 'ticket', '平台回复了你的工单', `工单「${ticket.subject}」有新回复`, { ticketId: ticket.id });
   opsAudit(req, 'ticket.reply', `ticket:${ticket.id}`, content.slice(0, 100));
   res.json({ ok: true });
+});
+
+// ---------- referral rewards ----------
+router.get('/referrals', opsAuthRequired, (req, res) => {
+  res.json(referral.opsOverview());
+});
+router.patch('/referral-withdrawals/:id', opsAuthRequired, requireOpsRole('superadmin', 'ops', 'finance'), (req, res) => {
+  try {
+    const w = referral.updateWithdrawal(req.params.id, req.body.status, req.body.note, req.opsUser.id);
+    opsAudit(req, 'referral.withdrawal', `withdrawal:${w.id}`, `${w.status} / ¥${(w.amount_cents / 100).toFixed(2)}`);
+    res.json({ ok: true, withdrawal: w });
+  } catch (e) {
+    res.status(e.status || 400).json({ error: e.message });
+  }
 });
 
 // ---------- platform team ----------

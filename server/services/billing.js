@@ -2,6 +2,7 @@
 const crypto = require('node:crypto');
 const { get, run, all, tx } = require('../db');
 const { planOf } = require('../plans');
+const referral = require('./referral');
 
 const RANK = { free: 0, standard: 1, pro: 2, enterprise: 3 };
 const SECRET = process.env.PAYMENT_WEBHOOK_SECRET || process.env.APP_SECRET || 'qingzhan-leadchat-dev-secret-2026';
@@ -87,6 +88,7 @@ function applyPaidOrder(orderId, { providerTradeNo = null } = {}, inTransaction 
       tenant.id, null, 'billing', '套餐已开通', `${planOf(order.plan).name} 已生效，当前周期至 ${String(end).slice(0, 10)}。`, JSON.stringify({ orderId: order.id, plan: order.plan, until: end })
     ]);
     run('INSERT INTO platform_audit_logs (action, target, detail) VALUES (?,?,?)', ['billing.paid', `tenant:${tenant.id}`, `${order.order_no} / ¥${(order.amount_cents / 100).toFixed(2)} / ${order.plan}`]);
+    try { referral.rewardPaidOrder(get('SELECT * FROM orders WHERE id = ?', [order.id])); } catch (e) { /* reward must not block payment */ }
     return { order: get('SELECT * FROM orders WHERE id = ?', [order.id]), tenant: get('SELECT * FROM tenants WHERE id = ?', [tenant.id]), duplicate: false };
   };
   return inTransaction ? execute() : tx(execute);

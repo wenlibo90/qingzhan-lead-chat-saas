@@ -27,11 +27,38 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
     document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('in'); });
   });
   await page.waitForTimeout(500);
-  if (!(await page.title()).includes('轻站')) throw new Error('landing title');
+  if (!(await page.title()).includes('轻客服')) throw new Error('landing title');
   const priceCards = await page.locator('.price-card').count();
   if (priceCards !== 4) throw new Error('pricing cards ' + priceCards);
   log('落地页加载，4 个套餐卡片');
   await page.screenshot({ path: SHOTS + '/01-landing.png', fullPage: true });
+
+  const consultTriggers = await page.locator('[data-consult]').count();
+  if (consultTriggers < 5) throw new Error('consult triggers ' + consultTriggers);
+  await page.locator('[data-consult]').first().click();
+  await page.waitForSelector('.consult-mask', { timeout: 3000 });
+  await page.fill('.consult-form input[name=name]', 'UI 测试顾问');
+  await page.fill('.consult-form input[name=phone]', '13912345678');
+  await page.locator('.consult-form button[type=submit]').click();
+  await page.waitForSelector('.consult-success.show', { timeout: 5000 });
+  await page.screenshot({ path: SHOTS + '/01a-consult-modal.png' });
+  await page.locator('[data-consult-close]').click();
+  if (await page.locator('.consult-mask').count()) throw new Error('consult modal not closed');
+  log('首页预约顾问弹窗从入口打开并提交成功');
+
+  const signupTriggers = await page.locator('[data-signup]').count();
+  if (signupTriggers < 6) throw new Error('signup triggers ' + signupTriggers);
+  await page.locator('[data-signup]').first().click();
+  await page.waitForSelector('.signup-mask', { timeout: 3000 });
+  if (!(await page.locator('.signup-intro').isVisible())) throw new Error('signup intro missing');
+  await page.fill('.signup-form input[name=phone]', '13700002222');
+  await page.locator('.signup-form [data-send-code]').click();
+  await page.waitForFunction(() => /演示环境验证码/.test((document.querySelector('.signup-hint') || {}).textContent || ''), null, { timeout: 5000 });
+  await page.screenshot({ path: SHOTS + '/01c-signup-modal.png' });
+  await page.locator('.signup-mask .consult-close').click();
+  if (await page.locator('.signup-mask').count()) throw new Error('signup modal not closed');
+  if ((await page.url()).includes('/signup')) throw new Error('signup modal navigated away');
+  log('首页免费注册弹窗打开、发码且不跳转');
 
   // cross-origin customer site: absolute embed must load core and config
   const crossServer = http.createServer((req, res) => {
@@ -51,6 +78,25 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
   log('跨域客户网站用绝对地址加载挂件');
   await crossPage.close();
   await new Promise((resolve) => crossServer.close(resolve));
+
+  // public i18n
+  const i18nCtx = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: 'en-US' });
+  const i18nPage = await i18nCtx.newPage();
+  i18nPage.on('pageerror', (e) => errors.push('i18n pageerror: ' + e.message));
+  await i18nPage.goto(BASE + '/', { waitUntil: 'networkidle' });
+  await i18nPage.selectOption('[data-lang-select]', 'en');
+  await i18nPage.waitForTimeout(500);
+  const heroCta = await i18nPage.locator('.hero-cta .btn-primary').innerText();
+  if (!/Sign up free/i.test(heroCta)) throw new Error('landing i18n failed: ' + heroCta);
+  const heroTitle = await i18nPage.locator('.hero h1').innerText();
+  if (!/lead CRM/i.test(heroTitle)) throw new Error('landing title i18n failed: ' + heroTitle);
+  await i18nPage.goto(BASE + '/signup/', { waitUntil: 'networkidle' });
+  await i18nPage.waitForTimeout(400);
+  const signupTitle = await i18nPage.locator('.s-card-head h2').innerText();
+  if (!/Create your account/i.test(signupTitle)) throw new Error('signup i18n failed: ' + signupTitle);
+  await i18nPage.screenshot({ path: SHOTS + '/01c-i18n.png' });
+  await i18nCtx.close();
+  log('落地页与注册页五语言切换');
 
   // widget on landing
   await page.waitForTimeout(800);
@@ -76,6 +122,27 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
   await admin.waitForSelector('#app:not([hidden])', { timeout: 10000 });
   await admin.waitForTimeout(1600);
   log('管理员登录并进入工作台');
+  const landingTitle = await admin.locator('.page-head h1').first().innerText();
+  if (landingTitle !== '数据概览') throw new Error('default page is not dashboard: ' + landingTitle);
+  await admin.click('[data-user]');
+  await admin.waitForTimeout(300);
+  await admin.click('[data-profile]');
+  await admin.waitForTimeout(300);
+  await admin.fill('[data-profile-name]', 'UI 管理员');
+  await admin.locator('[data-avatar="av2"]').click();
+  await admin.locator('.modal-card .modal-foot button').last().click();
+  await admin.waitForTimeout(800);
+  if (!(await admin.locator('.top-user .avatar-art').count())) throw new Error('profile avatar not applied');
+  log('修改昵称与内置头像，后台默认数据概览');
+  await admin.selectOption('[data-admin-lang]', 'en');
+  await admin.waitForTimeout(1600);
+  const enNav = await admin.locator('[data-nav="dashboard"] .n-label').innerText();
+  if (enNav !== 'Overview') throw new Error('admin i18n nav failed: ' + enNav);
+  await admin.selectOption('[data-admin-lang]', 'zh-CN');
+  await admin.waitForTimeout(1600);
+  const zhNav = await admin.locator('[data-nav="dashboard"] .n-label').innerText();
+  if (zhNav !== '数据概览') throw new Error('admin i18n restore failed: ' + zhNav);
+  log('后台语言切换到英文并恢复中文');
   await admin.screenshot({ path: SHOTS + '/04-admin-dashboard.png', fullPage: true });
   const metricText = await admin.locator('.metric-card .m-value').first().innerText();
   if (!metricText.trim()) throw new Error('dashboard metrics empty');
@@ -134,7 +201,7 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
   const pages = [
     ['visitors', 'visitor'], ['leads', 'lead'], ['reports', 'report'], ['widget', 'widget'], ['automation', 'automation'],
     ['knowledge', 'knowledge'], ['sites', 'sites'], ['forms', 'forms'], ['team', 'team'], ['billing', 'billing'],
-    ['settings', 'settings'], ['notifications', 'notifications'], ['support', 'support'], ['logs', 'logs']
+    ['settings', 'settings'], ['notifications', 'notifications'], ['support', 'support'], ['referral', 'referral'], ['logs', 'logs']
   ];
   for (const [key, file] of pages) {
     await admin.locator('[data-nav="' + key + '"]').click();
@@ -221,7 +288,7 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
     document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('in'); });
   });
   await mp.waitForTimeout(500);
-  await mp.screenshot({ path: SHOTS + '/14-mobile-landing.png', fullPage: true });
+  await mp.screenshot({ path: SHOTS + '/14-mobile-landing.png' });
   const mLauncher = mp.locator('#qz-widget-host .qz-launcher');
   await mLauncher.waitFor({ state: 'visible', timeout: 8000 });
   await mLauncher.click();
@@ -278,7 +345,7 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
   const embedText = await signup.locator('.code-box').first().innerText();
   if (!/src="https?:\/\/[^"]+\/qz\.js\?[a-f0-9]{32}/.test(embedText)) throw new Error('embed is not absolute: ' + embedText);
   await signup.screenshot({ path: SHOTS + '/17-signup-site.png', fullPage: true });
-  log('注册后添加自己的网站并返回接入向导');
+  log('注册后添加自己的网站并显示接入代码');
 
   // ---------- platform ops ----------
   const ops = await ctx.newPage();
@@ -292,14 +359,14 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
   await ops.waitForTimeout(1200);
   await ops.screenshot({ path: SHOTS + '/18-ops-overview.png', fullPage: true });
   log('平台运营后台登录');
-  for (const key of ['accounts', 'workspaces', 'applications', 'subscriptions', 'risk', 'tickets', 'team', 'logs']) {
+  for (const key of ['accounts', 'workspaces', 'applications', 'subscriptions', 'risk', 'referrals', 'tickets', 'team', 'logs']) {
     await ops.click('[data-nav="' + key + '"]');
     await ops.waitForTimeout(800);
     const title = await ops.locator('.topbar-title').innerText();
     if (!title) throw new Error('ops page ' + key);
     await ops.screenshot({ path: SHOTS + '/19-ops-' + key + '.png' });
   }
-  log('运营后台八个模块可打开');
+  log('运营后台九个模块可打开');
   await ops.click('[data-nav="tickets"]');
   await ops.waitForTimeout(700);
   const ticketBtn = ops.locator('[data-ticket]').first();

@@ -1,4 +1,4 @@
-/*! Qingzhan Lead Chat Widget loader v1.0 */
+/*! Qingke SaaS Widget loader v1.0 */
 (function () {
   'use strict';
   if (window.__QZ_LOADED__) return;

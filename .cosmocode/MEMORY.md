@@ -11,8 +11,8 @@
   - 安装依赖：`npm install`
   - 初始化/重置演示数据：`npm run seed`（会清空并重建 `data/app.db`）
   - 启动服务：`npm start`，单端口 3000，同时提供落地页 `/`、注册页 `/signup/`、客户后台 `/admin/`、平台运营后台 `/ops/`、演示站 `/demo/`、体验站 `/sandbox/:key`、挂件 `/widget.js`
-  - 后端冒烟测试：`npm test`（110 项），必须先启动服务
-  - 浏览器测试：`npm run test:ui`（37 项），依赖 Playwright Chromium，截图输出到 `/tmp/shots/`
+  - 后端冒烟测试：`npm test`（122 项），必须先启动服务
+  - 浏览器测试：`npm run test:ui`（41 项），依赖 Playwright Chromium，截图输出到 `/tmp/shots/`
 
 [项目知识：环境配置]
 - Date: 2026-10-30
@@ -46,4 +46,8 @@
   - 自助订阅：订单金额由 `server/services/billing.js` 服务端计算；开发环境 `PAYMENT_PROVIDER=mock` 可直接模拟支付；生产回调必须配置 `PAYMENT_WEBHOOK_SECRET` 并验签
   - 支付回调入口：`POST /api/public/payments/webhook/:provider`，使用 `x-payment-signature` HMAC-SHA256，`event_id` 幂等
   - 支持工单：客户 `/api/support/tickets`，运营 `/api/ops/tickets`，回复后发站内通知
+  - 推广激励：每个账号有 8 位 `referral_code`，短链 `/r/:code`，首单支付按 20% 生成奖励，7 天后可提现，最低 ¥100，运营人工审核
+  - 推广奖励在 `services/referral.js`，支付成功由 `billing.applyPaidOrder` 触发；提现审核在运营后台「推广奖励」
+  - 国际化：`public/i18n.js` 提供简中/繁中/英/日/韩；后台语言写入 `accounts.locale`，挂件语言由 `widget.locale` 控制
+  - 新增/修改语言文案时同时更新 `public/i18n.js` 和 `public/widget-core.js` 语言包
   - PQL 由 `services/lifecycle.js` 每小时调用 `services/pql.js`，默认条件为已安装 JS、访客≥50 且会话≥5或线索≥2

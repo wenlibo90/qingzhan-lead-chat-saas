@@ -10,7 +10,7 @@ const router = express.Router();
 
 function accountPublic(account) {
   if (!account) return null;
-  return { id: account.id, name: account.name, email: account.email, phone: account.phone, status: account.status, risk_score: account.risk_score, created_at: account.created_at };
+  return { id: account.id, name: account.name, email: account.email, phone: account.phone, status: account.status, risk_score: account.risk_score, referral_code: account.referral_code, locale: account.locale || 'zh-CN', created_at: account.created_at };
 }
 
 function membershipsOf(accountId) {
@@ -99,6 +99,20 @@ router.post('/switch', authRequired, (req, res) => {
     plan: planOf(tenant.plan),
     features: featuresOf(tenant.plan).map((f) => ({ code: f, name: FEATURES[f] }))
   });
+});
+
+router.patch('/profile', authRequired, (req, res) => {
+  const b = req.body || {};
+  const name = String(b.name || '').trim().slice(0, 30);
+  const allowed = ['av1', 'av2', 'av3', 'av4', 'av5', 'av6', 'av7', 'av8'];
+  const locales = ['zh-CN', 'zh-TW', 'en', 'ja', 'ko'];
+  if (b.locale !== undefined && !locales.includes(b.locale)) return res.status(400).json({ error: '语言不合法' });
+  if (!name) return res.status(400).json({ error: '昵称不能为空' });
+  if (b.avatar !== undefined && b.avatar !== '' && !allowed.includes(b.avatar)) return res.status(400).json({ error: '头像不合法' });
+  run('UPDATE users SET name = ?, avatar = ? WHERE id = ?', [name, b.avatar !== undefined ? b.avatar : req.user.avatar, req.user.id]);
+  if (req.account) run('UPDATE accounts SET name = ?, locale = COALESCE(?, locale) WHERE id = ?', [name, b.locale || null, req.account.id]);
+  audit(req, 'user.profile', req.user.email || req.user.phone || '', '更新昵称与头像');
+  res.json({ ok: true, user: publicUser(get('SELECT * FROM users WHERE id = ?', [req.user.id])) });
 });
 
 router.post('/password', authRequired, (req, res) => {

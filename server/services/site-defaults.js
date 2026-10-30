@@ -3,6 +3,7 @@
 function defaultWidget(overrides = {}) {
   return {
     primaryColor: '#2563eb',
+    locale: 'zh-CN',
     position: 'right',
     offsetBottom: 24,
     offsetSide: 24,

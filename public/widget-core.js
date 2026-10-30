@@ -1,9 +1,21 @@
-/*! Qingzhan Lead Chat Widget core v1.0 */
+/*! Qingke SaaS Widget core v1.0 */
 (function () {
   'use strict';
   var CONF = window.__QZ_CONFIG__ || {};
   var KEY = CONF.key || '';
   var BASE = CONF.base || location.origin;
+  var LOCALES = {
+    'zh-CN': { title: '在线客服', welcome: '您好，有什么可以帮您？', subtitle: '通常 1 分钟内回复', offline: '当前离线，可留言', powered: '由轻客服 SaaS 提供技术支持', faq: '自助帮助', close: '收起', sendFile: '发送文件', recording: '录屏反馈', input: '输入消息...', send: '发送', leave: '留言给我们', name: '称呼 *', phone: '手机号 *', message: '留言内容 *', submitMsg: '提交留言', submitted: '留言已提交', submittedDesc: '我们会在 1 个工作日内联系您，也可以继续查看常见问题。', viewFaq: '查看常见问题', faqIntro: '先看看有没有你关心的问题，解决不了再转人工。', toAgent: '没解决，转人工客服', ratingTitle: '这次咨询满意吗？', ratingDesc: '你的评价会帮助我们做得更好', ratingPlaceholder: '补充一句评价（选填）', submitRating: '提交评价', thanks: '感谢你的评价', formSubmitted: '已提交表单：', submit: '提交', submitting: '提交中...', submitFailed: '提交失败', recordingSent: '录屏已发送给客服', proactiveSuccess: '提交成功', proactiveDesc: '顾问会尽快联系你，也可以直接开始咨询。', startChat: '开始咨询' },
+    'zh-TW': { title: '線上客服', welcome: '您好，有什麼可以幫您？', subtitle: '通常 1 分鐘內回覆', offline: '目前離線，可留言', powered: '由輕客服 SaaS 提供技術支援', faq: '自助幫助', close: '收起', sendFile: '傳送檔案', recording: '錄屏回饋', input: '輸入訊息...', send: '傳送', leave: '留言給我們', name: '稱呼 *', phone: '手機號 *', message: '留言內容 *', submitMsg: '提交留言', submitted: '留言已提交', submittedDesc: '我們會在 1 個工作日內聯絡您，也可以繼續查看常見問題。', viewFaq: '查看常見問題', faqIntro: '先看看有沒有你關心的問題，解決不了再轉人工。', toAgent: '沒解決，轉人工客服', ratingTitle: '這次諮詢滿意嗎？', ratingDesc: '你的評價會幫助我們做得更好', ratingPlaceholder: '補充一句評價（選填）', submitRating: '提交評價', thanks: '感謝你的評價', formSubmitted: '已提交表單：', submit: '提交', submitting: '提交中...', submitFailed: '提交失敗', recordingSent: '錄屏已傳送給客服', proactiveSuccess: '提交成功', proactiveDesc: '顧問會盡快聯絡你，也可以直接開始諮詢。', startChat: '開始諮詢' },
+    en: { title: 'Live Support', welcome: 'Hi, how can we help?', subtitle: 'Usually replies within 1 minute', offline: 'We are offline. Leave a message.', powered: 'Powered by Qingke SaaS', faq: 'Help Center', close: 'Close', sendFile: 'Send file', recording: 'Screen recording', input: 'Type a message...', send: 'Send', leave: 'Leave us a message', name: 'Name *', phone: 'Phone *', message: 'Message *', submitMsg: 'Send message', submitted: 'Message sent', submittedDesc: 'We will contact you within one business day. You can also browse our FAQs.', viewFaq: 'View FAQs', faqIntro: 'Browse common questions first. If you still need help, talk to our team.', toAgent: 'Talk to a human', ratingTitle: 'How was this conversation?', ratingDesc: 'Your feedback helps us improve', ratingPlaceholder: 'Add a comment (optional)', submitRating: 'Submit rating', thanks: 'Thank you for your feedback', formSubmitted: 'Form submitted: ', submit: 'Submit', submitting: 'Submitting...', submitFailed: 'Submission failed', recordingSent: 'Recording sent to support', proactiveSuccess: 'Submitted', proactiveDesc: 'Our team will contact you soon. You can also start a chat now.', startChat: 'Start chat' },
+    ja: { title: 'オンラインサポート', welcome: 'こんにちは。どのようなご用件でしょうか？', subtitle: '通常 1 分以内に返信します', offline: '現在オフラインです。メッセージを残せます。', powered: 'Qingke SaaS 提供', faq: 'ヘルプセンター', close: '閉じる', sendFile: 'ファイルを送信', recording: '画面録画', input: 'メッセージを入力...', send: '送信', leave: 'メッセージを残す', name: 'お名前 *', phone: '電話番号 *', message: 'メッセージ *', submitMsg: '送信する', submitted: '送信しました', submittedDesc: '1 営業日以内にご連絡します。よくある質問もご覧いただけます。', viewFaq: 'よくある質問を見る', faqIntro: 'まずよくある質問をご確認ください。解決しない場合は担当者におつなぎします。', toAgent: '担当者に相談する', ratingTitle: '今回の対応はいかがでしたか？', ratingDesc: 'ご意見はサービス改善に役立てます', ratingPlaceholder: 'コメント（任意）', submitRating: '評価を送信', thanks: 'ご評価ありがとうございます', formSubmitted: 'フォーム送信済み：', submit: '送信', submitting: '送信中...', submitFailed: '送信に失敗しました', recordingSent: '画面録画を送信しました', proactiveSuccess: '送信しました', proactiveDesc: '担当者よりご連絡します。今すぐチャットも開始できます。', startChat: 'チャットを開始' },
+    ko: { title: '온라인 상담', welcome: '안녕하세요. 무엇을 도와드릴까요?', subtitle: '보통 1분 이내에 답변합니다', offline: '현재 오프라인입니다. 메시지를 남겨주세요.', powered: 'Qingke SaaS 제공', faq: '도움말 센터', close: '닫기', sendFile: '파일 보내기', recording: '화면 녹화', input: '메시지를 입력하세요...', send: '보내기', leave: '메시지 남기기', name: '이름 *', phone: '전화번호 *', message: '메시지 *', submitMsg: '메시지 보내기', submitted: '메시지가 전송되었습니다', submittedDesc: '영업일 기준 1일 이내에 연락드리겠습니다. 자주 묻는 질문도 확인할 수 있습니다.', viewFaq: '자주 묻는 질문', faqIntro: '먼저 자주 묻는 질문을 확인해 주세요. 해결되지 않으면 상담원에게 연결합니다.', toAgent: '상담원 연결', ratingTitle: '상담에 만족하셨나요?', ratingDesc: '의견은 서비스 개선에 도움이 됩니다', ratingPlaceholder: '의견을 남겨주세요 (선택)', submitRating: '평가 보내기', thanks: '평가해 주셔서 감사합니다', formSubmitted: '양식 제출됨: ', submit: '제출', submitting: '제출 중...', submitFailed: '제출 실패', recordingSent: '화면 녹화를 전송했습니다', proactiveSuccess: '제출되었습니다', proactiveDesc: '담당자가 곧 연락드립니다. 지금 바로 상담을 시작할 수도 있습니다.', startChat: '상담 시작' }
+  };
+  function t(key, fallback) {
+    var lang = (widget && widget.locale) || 'zh-CN';
+    var dict = LOCALES[lang] || LOCALES['zh-CN'];
+    return dict[key] || LOCALES['zh-CN'][key] || fallback || '';
+  }
   var QUEUE = CONF.queue || [];
   var LEGACY_API = CONF.api || null;
   if (!KEY || window.Qingzhan && window.Qingzhan.__coreLoaded) return;
@@ -477,7 +489,7 @@
     renderAnnouncement();
     if (!widget.showBranding) { /* white label */ }
     // panel
-    var panel = el('div', { class: 'qz-panel', role: 'dialog', 'aria-label': '在线客服' });
+    var panel = el('div', { class: 'qz-panel', role: 'dialog', 'aria-label': t('title') });
     shadow.appendChild(panel);
     ui.panel = panel;
     panel.innerHTML = panelHtml();
@@ -526,7 +538,7 @@
   }
 
   function renderLauncher() {
-    var btn = el('button', { class: 'qz-launcher ' + (widget.animation === 'breath' ? 'qz-breath' : widget.animation === 'bounce' ? 'qz-bounce' : ''), 'aria-label': '打开在线客服' });
+    var btn = el('button', { class: 'qz-launcher ' + (widget.animation === 'breath' ? 'qz-breath' : widget.animation === 'bounce' ? 'qz-bounce' : ''), 'aria-label': t('title') });
     btn.innerHTML = icon(widget.icon || 'headset', 26);
     var badge = el('span', { class: 'qz-badge', style: 'display:none' });
     btn.appendChild(badge);
@@ -535,7 +547,7 @@
     ui.badge = badge;
     ui.root.appendChild(btn);
     var hint = el('div', { class: 'qz-hint' });
-    hint.innerHTML = '<b>' + esc(widget.agentName || '在线客服') + '</b>' + esc(widget.welcome || '您好，有什么可以帮您？');
+    hint.innerHTML = '<b>' + esc(widget.agentName || t('title')) + '</b>' + esc(widget.welcome || t('welcome'));
     hint.addEventListener('click', openChat);
     hint.style.display = 'none';
     ui.hint = hint;
@@ -543,15 +555,15 @@
   }
 
   function panelHtml() {
-    var branding = widget.showBranding ? '<div class="qz-foot">由 <a href="' + BASE + '/" target="_blank" rel="noopener">轻站线索客服</a> 提供技术支持</div>' : '';
+    var branding = widget.showBranding ? '<div class="qz-foot">由 <a href="' + BASE + '/" target="_blank" rel="noopener">轻客服 SaaS</a> 提供技术支持</div>' : '';
     return '' +
       '<div class="qz-head">' +
       '<div class="qz-head-top">' +
-      '<div class="qz-avatar">' + (!widget.showBranding ? icon('logo', 24) : esc((widget.agentName || '客').slice(0, 1))) + '</div>' +
-      '<div><div class="qz-head-name">' + esc(widget.title || '在线客服') + '<span class="qz-dot" data-online></span></div><div class="qz-head-sub" data-sub>' + esc(widget.subtitle || '') + '</div></div>' +
+      '<div class="qz-avatar">' + (!widget.showBranding ? icon('logo', 24) : esc((widget.agentName || t('title')).slice(0, 1))) + '</div>' +
+      '<div><div class="qz-head-name">' + esc(widget.title || t('title')) + '<span class="qz-dot" data-online></span></div><div class="qz-head-sub" data-sub>' + esc(widget.subtitle || '') + '</div></div>' +
       '<div class="qz-head-actions">' +
-      '<button class="qz-icon-btn" data-act="faq" title="自助帮助" aria-label="自助帮助">' + icon('book', 16) + '</button>' +
-      '<button class="qz-icon-btn" data-act="close" title="收起" aria-label="收起">' + icon('close', 16) + '</button>' +
+      '<button class="qz-icon-btn" data-act="faq" title="' + t('faq') + '" aria-label="' + t('faq') + '">' + icon('book', 16) + '</button>' +
+      '<button class="qz-icon-btn" data-act="close" title="' + t('close') + '" aria-label="' + t('close') + '">' + icon('close', 16) + '</button>' +
       '</div></div></div>' +
       '<div class="qz-body">' +
       '<div class="qz-scroll" data-scroll></div>' +
@@ -559,11 +571,11 @@
       '<div class="qz-compose">' +
       '<div class="qz-inputrow">' +
       '<div class="qz-tools">' +
-      '<button class="qz-tool" data-act="file" title="发送文件" aria-label="发送文件">' + icon('paperclip', 16) + '</button>' +
-      (widget.recordingEnabled ? '<button class="qz-tool" data-act="record" title="录屏反馈" aria-label="录屏反馈">' + icon('video', 16) + '</button>' : '') +
+      '<button class="qz-tool" data-act="file" title="' + t('sendFile') + '" aria-label="' + t('sendFile') + '">' + icon('paperclip', 16) + '</button>' +
+      (widget.recordingEnabled ? '<button class="qz-tool" data-act="record" title="' + t('recording') + '" aria-label="' + t('recording') + '">' + icon('video', 16) + '</button>' : '') +
       '</div>' +
-      '<textarea class="qz-input" rows="1" placeholder="输入消息..." aria-label="输入消息"></textarea>' +
-      '<button class="qz-send" data-act="send" disabled aria-label="发送">' + icon('send', 16) + '</button>' +
+      '<textarea class="qz-input" rows="1" placeholder="' + t('input') + '" aria-label="' + t('input') + '"></textarea>' +
+      '<button class="qz-send" data-act="send" disabled aria-label="' + t('send') + '">' + icon('send', 16) + '</button>' +
       '</div></div>' +
       '<div data-screen></div>' +
       branding +
@@ -761,9 +773,9 @@
     var dot = ui.panel.querySelector('[data-online]');
     if (dot) dot.className = 'qz-dot' + (online ? '' : ' off');
     var sub = ui.panel.querySelector('[data-sub]');
-    if (sub) sub.textContent = online ? (widget.subtitle || '通常 1 分钟内回复') : '当前离线，可留言';
+    if (sub) sub.textContent = online ? (widget.subtitle || t('subtitle')) : t('offline');
     var nameEl = ui.panel.querySelector('.qz-head-name');
-    if (nameEl) nameEl.innerHTML = esc(widget.title || '在线客服') + '<span class="qz-dot' + (online ? '' : ' off') + '"></span>';
+    if (nameEl) nameEl.innerHTML = esc(widget.title || t('title')) + '<span class="qz-dot' + (online ? '' : ' off') + '"></span>';
   }
   function updateOnlineStatus() {
     var dot = ui.panel.querySelector('[data-online]');
@@ -802,7 +814,7 @@
     } else if ((m.type === 'file') && m.fileUrl) {
       bubble.innerHTML = '<a class="qz-file" href="' + esc(m.fileUrl) + '" target="_blank" rel="noopener"><span class="qz-file-icon">' + icon('paperclip', 15) + '</span><span><span class="qz-file-name">' + esc(m.fileName || '附件') + '</span><span class="qz-file-size">' + fmtSize(m.fileSize) + '</span></span></a>';
     } else if (m.type === 'form' && m.meta && m.meta.form) {
-      bubble.textContent = '已提交表单：' + (m.meta.form.title || '');
+      bubble.textContent = t('formSubmitted') + (m.meta.form.title || '');
     } else {
       bubble.innerHTML = esc(m.content || '').replace(/\n/g, '<br>');
     }
@@ -957,7 +969,7 @@
     fd.append('duration', String(Math.round((Date.now() - recStart) / 1000)));
     fetch(BASE + '/api/public/recording?key=' + encodeURIComponent(KEY), { method: 'POST', body: fd })
       .then(function (r) { return r.json(); })
-      .then(function (res) { if (res.error) throw new Error(res.error); toast('录屏已发送给客服'); })
+      .then(function (res) { if (res.error) throw new Error(res.error); toast(t('recordingSent')); })
       .catch(function (e) { toast(e.message || '录屏上传失败'); });
   }
 
@@ -973,7 +985,7 @@
       if (f.type === 'radio') return '<div class="qz-field">' + label + (f.options || []).map(function (o) { return '<label style="font-weight:400;display:inline-flex;gap:5px;margin-right:10px"><input type="radio" name="' + esc(f.key) + '" value="' + esc(o) + '" style="width:auto">' + esc(o) + '</label>'; }).join('') + '</div>';
       return '<div class="qz-field">' + label + '<input name="' + esc(f.key) + '" type="' + (f.type === 'phone' ? 'tel' : f.type === 'email' ? 'email' : 'text') + '"' + ph + required + '></div>';
     }).join('');
-    return fields + '<button class="qz-primary" data-submit-form>' + esc(submitLabel || form.button_text || '提交') + '</button>';
+    return fields + '<button class="qz-primary" data-submit-form>' + esc(submitLabel || form.button_text || t('submit')) + '</button>';
   }
   function collectForm(container) {
     var data = {};
@@ -986,7 +998,7 @@
   function submitForm(formId, container, done) {
     var data = collectForm(container);
     var btn = container.querySelector('[data-submit-form]');
-    if (btn) { btn.disabled = true; btn.textContent = '提交中...'; }
+    if (btn) { btn.disabled = true; btn.textContent = t('submitting'); }
     api('/api/public/form/' + formId, { body: { key: KEY, vid: vid, data: data, conversationId: conversationId, consent: consentAllowed() } })
       .then(function (res) {
         if (res.ok) {
@@ -996,8 +1008,8 @@
         }
       })
       .catch(function (e) {
-        if (btn) { btn.disabled = false; btn.textContent = '提交'; }
-        toast(e.message || '提交失败');
+        if (btn) { btn.disabled = false; btn.textContent = t('submit'); }
+        toast(e.message || t('submitFailed'));
       });
   }
   function showPrechat() {
@@ -1028,11 +1040,11 @@
     var form = config.forms && config.forms.offline;
     ui.screen.style.display = 'block';
     var screen = el('div', { class: 'qz-screen' });
-    screen.innerHTML = '<h3>留言给我们</h3><p>' + esc(widget.offlineText) + '</p>';
+    screen.innerHTML = '<h3>' + t('leave') + '</h3><p>' + esc(widget.offlineText) + '</p>';
     if (form) {
       screen.innerHTML += '<div data-form>' + formHtml(form, form.button_text) + '</div>';
     } else {
-      screen.innerHTML += '<div class="qz-field"><label>称呼 *</label><input name="name" required></div><div class="qz-field"><label>手机号 *</label><input name="phone" type="tel" required></div><div class="qz-field"><label>留言内容 *</label><textarea name="content" required></textarea></div><button class="qz-primary" data-submit-offline>提交留言</button>';
+      screen.innerHTML += '<div class="qz-field"><label>' + t('name') + '</label><input name="name" required></div><div class="qz-field"><label>' + t('phone') + '</label><input name="phone" type="tel" required></div><div class="qz-field"><label>' + t('message') + '</label><textarea name="content" required></textarea></div><button class="qz-primary" data-submit-offline>' + t('submitMsg') + '</button>';
     }
     ui.screen.innerHTML = '';
     ui.screen.appendChild(screen);
@@ -1043,19 +1055,19 @@
       submit.disabled = true;
       api('/api/public/offline', { body: { key: KEY, vid: vid, name: data.name, phone: data.phone, content: data.content, consent: consentAllowed() } })
         .then(function () {
-          screen.innerHTML = '<h3>留言已提交</h3><p>我们会在 1 个工作日内联系您，也可以继续查看常见问题。</p><button class="qz-primary" data-faq>查看常见问题</button>';
+          screen.innerHTML = '<h3>' + t('submitted') + '</h3><p>' + t('submittedDesc') + '</p><button class="qz-primary" data-faq>' + t('viewFaq') + '</button>';
           screen.querySelector('[data-faq]').addEventListener('click', showFaq);
         })
-        .catch(function (e) { submit.disabled = false; toast(e.message || '提交失败'); });
+        .catch(function (e) { submit.disabled = false; toast(e.message || t('submitFailed')); });
     });
   }
 
   // ---------------- FAQ ----------------
   function showFaq() {
-    if (!widget.faqEnabled || !config.faqs || !config.faqs.length) { toast('知识库暂未开放'); return; }
+    if (!widget.faqEnabled || !config.faqs || !config.faqs.length) { toast(t('faq')); return; }
     ui.screen.style.display = 'block';
     var screen = el('div', { class: 'qz-screen' });
-    var html = '<h3>自助帮助</h3><p>先看看有没有你关心的问题，解决不了再转人工。</p>';
+    var html = '<h3>' + t('faq') + '</h3><p>' + t('faqIntro') + '</p>';
     config.faqs.forEach(function (cat) {
       html += '<div class="qz-faq-cat">' + esc(cat.name) + '</div>';
       cat.items.forEach(function (item) {
@@ -1067,7 +1079,7 @@
         }
       });
     });
-    html += '<button class="qz-ghost" data-agent>没解决，转人工客服</button>';
+    html += '<button class="qz-ghost" data-agent>' + t('toAgent') + '</button>';
     screen.innerHTML = html;
     ui.screen.innerHTML = '';
     ui.screen.appendChild(screen);
@@ -1093,7 +1105,7 @@
     var card = el('div', { class: 'qz-rating' });
     card.innerHTML = '<h4>这次咨询满意吗？</h4><p>你的评价会帮助我们做得更好</p><div class="qz-stars">' +
       [1, 2, 3, 4, 5].map(function (i) { return '<button class="qz-star" data-star="' + i + '" aria-label="' + i + '星">' + icon('star', 24) + '</button>'; }).join('') +
-      '</div><textarea placeholder="补充一句评价（选填）" data-comment></textarea><button class="qz-primary" data-rating-submit disabled>提交评价</button>';
+      '</div><textarea placeholder="' + t('ratingPlaceholder') + '" data-comment></textarea><button class="qz-primary" data-rating-submit disabled>' + t('submitRating') + '</button>';
     ui.scroll.appendChild(card);
     scrollBottom();
     var score = 0;
@@ -1111,9 +1123,9 @@
       btn.disabled = true;
       api('/api/public/rating', { body: { conversationId: conversationId, score: score, comment: card.querySelector('[data-comment]').value } })
         .then(function () {
-          card.innerHTML = '<h4>感谢你的评价</h4><p>' + icon('check', 18) + ' 已收到 ' + score + ' 星反馈</p>';
+          card.innerHTML = '<h4>' + t('thanks') + '</h4><p>' + icon('check', 18) + ' 已收到 ' + score + ' 星反馈</p>';
         })
-        .catch(function (e) { btn.disabled = false; toast(e.message || '提交失败'); });
+        .catch(function (e) { btn.disabled = false; toast(e.message || t('submitFailed')); });
     });
   }
 
@@ -1139,7 +1151,7 @@
     card.style[pos] = side + 'px';
     card.style.bottom = (Number(widget.offsetBottom || 24) + size + 14) + 'px';
     var type = actions.type || 'message';
-    var head = '<div class="qz-proactive-head"><div class="qz-proactive-avatar">' + icon(type === 'form' ? 'message' : 'chat', 16) + '</div><div class="qz-proactive-title">' + esc(actions.title || widget.agentName || '在线客服') + '</div><button class="qz-proactive-close" aria-label="关闭">&times;</button></div>';
+    var head = '<div class="qz-proactive-head"><div class="qz-proactive-avatar">' + icon(type === 'form' ? 'message' : 'chat', 16) + '</div><div class="qz-proactive-title">' + esc(actions.title || widget.agentName || t('title')) + '</div><button class="qz-proactive-close" aria-label="关闭">&times;</button></div>';
     var body = '<div class="qz-proactive-body"><b>' + esc(actions.title || '') + '</b>' + esc(actions.message || '') + '</div>';
     if (type === 'form' && actions.formId) {
       var form = (config.forms && config.forms.all || []).filter(function (f) { return f.id === Number(actions.formId); })[0];
@@ -1164,7 +1176,7 @@
         required.forEach(function (i) { if (!i.value.trim()) { bad = true; } });
         if (bad) { toast('请填写必填项'); return; }
         submitForm(formId, card, function () {
-          card.innerHTML = head + '<div class="qz-proactive-body"><b>提交成功</b>顾问会尽快联系你，也可以直接开始咨询。</div><div class="qz-proactive-body" style="padding-top:0"><button class="qz-primary" data-popen>开始咨询</button></div>';
+          card.innerHTML = head + '<div class="qz-proactive-body"><b>提交成功</b>顾问会尽快联系你，也可以直接开始咨询。</div><div class="qz-proactive-body" style="padding-top:0"><button class="qz-primary" data-popen>' + t('startChat') + '</button></div>';
           card.querySelector('[data-popen]').addEventListener('click', function () { card.remove(); openChat(); });
         });
       });

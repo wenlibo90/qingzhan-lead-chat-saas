@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   signup_source TEXT,
   signup_ip TEXT,
   risk_score INTEGER NOT NULL DEFAULT 0,
+  referral_code TEXT,
+  locale TEXT NOT NULL DEFAULT 'zh-CN',
   last_login_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -565,3 +567,51 @@ CREATE TABLE IF NOT EXISTS ticket_messages (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_ticket_messages ON ticket_messages(ticket_id, id);
+
+
+CREATE TABLE IF NOT EXISTS referral_visits (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT NOT NULL,
+  ip TEXT,
+  ua TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_ref_visits ON referral_visits(code, created_at);
+
+CREATE TABLE IF NOT EXISTS referrals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  referrer_account_id INTEGER NOT NULL,
+  referred_account_id INTEGER NOT NULL UNIQUE,
+  code TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'registered',
+  ip TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  activated_at TEXT,
+  paid_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_account_id, status);
+
+CREATE TABLE IF NOT EXISTS referral_rewards (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  referrer_account_id INTEGER NOT NULL,
+  referral_id INTEGER NOT NULL,
+  order_id INTEGER NOT NULL UNIQUE,
+  amount_cents INTEGER NOT NULL,
+  rate INTEGER NOT NULL DEFAULT 20,
+  status TEXT NOT NULL DEFAULT 'pending',
+  available_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_ref_rewards ON referral_rewards(referrer_account_id, status);
+
+CREATE TABLE IF NOT EXISTS referral_withdrawals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id INTEGER NOT NULL,
+  amount_cents INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'requested',
+  note TEXT,
+  platform_user_id INTEGER,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  processed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ref_withdrawals ON referral_withdrawals(account_id, status);

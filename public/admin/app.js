@@ -225,8 +225,8 @@
         size: 'narrow',
         body: '<p style="font-size:12.5px;line-height:1.7;color:#475569;margin:0">' + A.esc(opts.message || '') + '</p>',
         footer: [
-          { label: '取消', class: 'au-btn--ghost', onClick: function (c, close) { close(); resolve(false); } },
-          { label: opts.okText || '确定', class: opts.danger ? 'au-btn--danger' : 'au-btn--primary', onClick: function (c, close) { close(); resolve(true); } }
+          { label: '取消', class: 'au-btn--ghost', onClick: function (c, close) { resolve(false); close(); } },
+          { label: opts.okText || '确定', class: opts.danger ? 'au-btn--danger' : 'au-btn--primary', onClick: function (c, close) { resolve(true); close(); } }
         ],
         onClose: function () { resolve(false); }
       });
@@ -239,8 +239,8 @@
         title: opts.title || '输入',
         body: '<label class="field-label">' + A.esc(opts.label || '') + '</label>' + (opts.textarea ? '<textarea class="az-textarea" data-pv></textarea>' : '<input class="az-input" data-pv>'),
         footer: [
-          { label: '取消', class: 'au-btn--ghost', onClick: function (c, close) { close(); resolve(null); } },
-          { label: '确定', class: 'au-btn--primary', onClick: function (c, close) { var v = c.querySelector('[data-pv]').value.trim(); close(); resolve(v); } }
+          { label: '取消', class: 'au-btn--ghost', onClick: function (c, close) { resolve(null); close(); } },
+          { label: '确定', class: 'au-btn--primary', onClick: function (c, close) { var v = c.querySelector('[data-pv]').value.trim(); resolve(v); close(); } }
         ],
         onClose: function () { resolve(null); }
       });
@@ -306,6 +306,7 @@
     },
     {
       title: '增长与转化', items: [
+        { key: 'referral', label: '推广中心', icon: 'star', roles: ['admin', 'operator', 'agent'] },
         { key: 'reports', label: '数据报表', icon: 'chart', feature: 'source_stats', roles: ['admin', 'operator'] },
         { key: 'automation', label: '自动化规则', icon: 'zap', feature: 'triggers', roles: ['admin', 'operator'] },
         { key: 'knowledge', label: '知识库', icon: 'book', feature: 'knowledge', roles: ['admin', 'operator'] },
@@ -331,8 +332,38 @@
     }
   ];
 
+  A.t = function (value) { return window.I18N ? window.I18N.t(value) : value; };
+  A.setLocale = function (locale) {
+    if (window.I18N) window.I18N.setLocale(locale);
+    var u = A.state.user;
+    var done = function () { location.reload(); };
+    if (u && A.state.token) A.apiPatch('/api/auth/profile', { name: u.name, locale: locale }).then(done).catch(done);
+    else done();
+  };
+  A.langSelectHtml = function (attr) {
+    return '<select class="top-select top-lang" ' + (attr || 'data-admin-lang') + '>' + (window.I18N ? I18N.locales : []).map(function (l) {
+      return '<option value="' + l.code + '">' + l.label + '</option>';
+    }).join('') + '</select>';
+  };
   A.planName = function (code) {
     return ({ free: '免费版', standard: '标准版', pro: '专业版', enterprise: '企业版' })[code] || code;
+  };
+  A.avatarDefs = [
+    { id: 'av1', bg: 'linear-gradient(135deg,#2563eb,#06b6d4)', icon: 'chat' },
+    { id: 'av2', bg: 'linear-gradient(135deg,#8b5cf6,#ec4899)', icon: 'sparkles' },
+    { id: 'av3', bg: 'linear-gradient(135deg,#10b981,#06b6d4)', icon: 'star' },
+    { id: 'av4', bg: 'linear-gradient(135deg,#f59e0b,#ef4444)', icon: 'zap' },
+    { id: 'av5', bg: 'linear-gradient(135deg,#0f766e,#14b8a6)', icon: 'shield' },
+    { id: 'av6', bg: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', icon: 'globe' },
+    { id: 'av7', bg: 'linear-gradient(135deg,#be123c,#f97316)', icon: 'target' },
+    { id: 'av8', bg: 'linear-gradient(135deg,#334155,#0ea5e9)', icon: 'phone' }
+  ];
+  A.avatarHtml = function (user, extra, iconSize) {
+    var id = user && user.avatar;
+    var def = A.avatarDefs.filter(function (a) { return a.id === id; })[0];
+    var cls = 'au-avatar avatar-art' + (extra ? ' ' + extra : '');
+    if (def) return '<span class="' + cls + '" style="background:' + def.bg + '">' + A.icon(def.icon, iconSize || 15) + '</span>';
+    return '<span class="' + cls + '">' + A.esc(((user && user.name) || '?').slice(0, 1)) + '</span>';
   };
   A.featureNeeded = function (feature) {
     if (['triggers', 'forms', 'visitor_profile_basic', 'source_stats', 'keyword_reply', 'rating'].indexOf(feature) > -1) return '标准版';
@@ -347,63 +378,112 @@
     document.getElementById('app').hidden = true;
     var screen = document.getElementById('login-screen');
     screen.hidden = false;
+    screen.classList.add('has-image');
+    var feature = function (img, icon, title, tone) {
+      return '<article class="login-feature ' + tone + '">' +
+        '<img src="/assets/login/' + img + '" alt="" loading="lazy">' +
+        '<div class="login-feature-head"><span>' + A.icon(icon, 15) + '</span><b>' + A.t(title) + '</b></div>' +
+        '</article>';
+    };
     screen.innerHTML =
       '<div class="login-brand">' +
-      '<div class="login-logo"><span class="login-logo-mark">' + A.icon('chat', 20) + '</span>轻站线索客服</div>' +
-      '<div class="login-hero">' +
-      '<h1>一段 JS，<br>把官网变成线索引擎</h1>' +
-      '<p>客服对话、访客行为、主动触达、知识库与轻线索 CRM，全部复用同一段嵌入代码。客户网站只加一次 JS，后台开启即生效。</p>' +
-      '<div class="login-points">' +
-      '<div class="login-point"><span>' + A.icon('check', 13) + '</span>异步懒加载，不阻塞宿主网站首屏</div>' +
-      '<div class="login-point"><span>' + A.icon('check', 13) + '</span>实时聊天 + 无埋点行为采集 + 意向打分</div>' +
-      '<div class="login-point"><span>' + A.icon('check', 13) + '</span>多租户数据隔离，RBAC 权限体系</div>' +
+        '<div class="login-brandline"><span class="login-logo-mark"><img src="/assets/logo.webp" alt=""></span><span>' + A.t('轻客服 SaaS') + '</span></div>' +
+        '<div class="login-stage" aria-hidden="true">' +
+          '<div class="lv lv-bubble lv-bubble--1"><img src="/assets/login/login-03.webp" alt=""></div>' +
+          '<div class="lv lv-bubble lv-bubble--2"><img src="/assets/login/login-04.webp" alt=""></div>' +
+          '<div class="lv lv-bubble lv-bubble--3"><img src="/assets/login/login-05.webp" alt=""></div>' +
+          '<div class="lv lv-chart"><img src="/assets/login/login-02.webp" alt=""></div>' +
+          '<div class="lv lv-tag"><span class="lv-tag-pill"><i></i>' + A.t('线索沉淀') + '</span></div>' +
+          '<div class="lv lv-dash"><img src="/assets/login/login-01.webp" alt=""></div>' +
+        '</div>' +
+        '<div class="login-copy">' +
+          '<h1><span>' + A.t('客服挂件接住访客，') + '</span><br><span>' + A.t('线索 CRM 沉淀商机') + '</span></h1>' +
+          '<p>' + A.t('从访客接入到商机沉淀，一站式提升转化') + '</p>' +
+          '<p class="login-desc">一段客服挂件接入网站，实时接待、记录行为、主动触达，再把咨询沉淀为线索，进入线索CRM跟进成交。</p>' +
+          '<div class="login-quick">' +
+            '<span class="login-quick-item">' + A.icon('check', 12) + '异步懒加载，不阻塞宿主网站首屏</span>' +
+            '<span class="login-quick-item">' + A.icon('check', 12) + '实时聊天+无埋点行为采集+意向打分</span>' +
+            '<span class="login-quick-item">' + A.icon('check', 12) + '多租户数据隔离，RBAC权限体系</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="login-features">' +
+          feature('login-07.webp', 'chat', '在线接待', 'is-blue') +
+          feature('login-08.webp', 'leads', '线索沉淀', 'is-warm') +
+          feature('login-09.webp', 'chart', '数据复盘', 'is-cyan') +
+        '</div>' +
+        '<div class="login-foot">2026轻客服SaaS·客服挂件接住访客，线索CRM沉淀商机</div>' +
       '</div>' +
-      '<div class="login-code"><span class="tag">&lt;script</span> <b>async</b> src<span class="tag">=</span><b>"https://cdn.qingzhan.cn/qz.js?YOUR_LOADER_TOKEN"</b><span class="tag">&gt;&lt;/script&gt;</span></div>' +
-      '<div class="login-foot">© 2026 轻站线索客服 · 一段代码，完整闭环</div>' +
-      '</div></div>' +
       '<div class="login-form-wrap"><form class="login-card" id="login-form">' +
-      '<h2>登录工作台</h2><p class="muted">使用团队账号登录，或使用下方演示账号快速体验。</p>' +
-      '<div class="au-form-group"><label class="au-label">手机号或邮箱</label><input class="au-input" type="text" name="identifier" placeholder="手机号 / you@company.com" value="admin@demo.com" required></div>' +
-      '<div class="au-form-group"><label class="au-label">密码</label><input class="au-input" type="password" name="password" placeholder="请输入密码" value="admin123" required></div>' +
-      '<div class="flex items-center justify-between mb-2"><label class="small muted flex items-center gap-1"><input type="checkbox" checked> 记住登录状态</label><span class="small muted">没有账号？<a href="/signup">免费注册</a></span></div>' +
-      '<button class="au-btn au-btn--primary au-btn--lg" style="width:100%" type="submit">进入工作台</button>' +
-      '<div class="demo-accounts"><p>演示账号（点击自动登录）</p><div class="demo-row">' +
-      '<button type="button" class="demo-chip" data-email="admin@demo.com" data-pass="admin123">管理员 · 林晓</button>' +
-      '<button type="button" class="demo-chip" data-email="ops@demo.com" data-pass="ops123">运营 · 周敏</button>' +
-      '<button type="button" class="demo-chip" data-email="agent@demo.com" data-pass="agent123">客服 · 陈曦</button>' +
-      '</div></div>' +
-      '<div id="login-error" class="notice danger mt-2" style="display:none"></div>' +
-      '<div class="tiny muted mt-2" style="text-align:center">平台运营账号请前往 <a href="/ops/">运营后台</a></div>' +
+        '<div class="login-mobile-brand"><span class="login-logo-mark"><img src="/assets/logo.webp" alt=""></span><b>' + A.t('轻客服 SaaS') + '</b></div>' +
+        '<div class="login-card-head"><h2>' + A.t('登录工作台') + '</h2><div class="login-lang-wrap">' + A.langSelectHtml('data-login-lang') + '</div></div>' +
+        '<p class="login-sub">' + A.t('使用注册账号或团队账号登录，也可点击演示账号快速体验。') + '</p>' +
+        '<div class="au-form-group login-field"><label class="au-label">' + A.t('手机号或邮箱') + '</label><input class="au-input" type="text" name="identifier" placeholder="' + A.t('手机号 / you@company.com') + '" autocomplete="username" required></div>' +
+        '<div class="au-form-group login-field"><label class="au-label">' + A.t('密码') + '</label><input class="au-input" type="password" name="password" placeholder="' + A.t('请输入密码') + '" autocomplete="current-password" required></div>' +
+        '<div class="login-options"><label class="login-remember"><input type="checkbox" checked><span class="login-check" aria-hidden="true"></span><span>' + A.t('记住登录状态') + '</span></label><span class="login-register">' + A.t('没有账号？') + ' <a href="/signup">' + A.t('免费注册') + '</a></span></div>' +
+        '<button class="au-btn au-btn--primary au-btn--lg login-submit" type="submit">' + A.t('进入工作台') + '</button>' +
+        '<div class="demo-accounts"><p>' + A.t('演示账号（点击自动登录）') + '</p><div class="demo-row">' +
+          '<button type="button" class="demo-chip" data-email="admin@demo.com" data-pass="admin123">管理员 · 林晓</button>' +
+          '<button type="button" class="demo-chip" data-email="ops@demo.com" data-pass="ops123">运营 · 周敏</button>' +
+          '<button type="button" class="demo-chip" data-email="agent@demo.com" data-pass="agent123">客服 · 陈曦</button>' +
+        '</div></div>' +
+        '<div id="login-error" class="notice danger" style="display:none"></div>' +
+        '<div class="login-ops">' + A.t('平台运营账号请前往') + ' <a href="/ops/">' + A.t('运营后台') + '</a></div>' +
       '</form></div>';
     var form = document.getElementById('login-form');
     var errBox = document.getElementById('login-error');
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var identifier = form.identifier.value.trim();
-      var password = form.password.value;
-      var btn = form.querySelector('button[type=submit]');
-      btn.disabled = true;
-      btn.textContent = '登录中...';
+    var loginLang = document.querySelector('[data-login-lang]');
+    if (loginLang) {
+      loginLang.value = window.I18N ? I18N.locale : 'zh-CN';
+      loginLang.addEventListener('change', function () { A.setLocale(loginLang.value); });
+    }
+    var stage = screen.querySelector('.login-stage');
+    if (screen._qzParallax) screen.removeEventListener('pointermove', screen._qzParallax);
+    if (stage && !window.matchMedia('(prefers-reduced-motion: reduce)').matches && window.matchMedia('(pointer:fine)').matches) {
+      var raf = 0;
+      screen._qzParallax = function (e) {
+        if (raf) return;
+        raf = requestAnimationFrame(function () {
+          raf = 0;
+          var rect = screen.getBoundingClientRect();
+          var x = Math.max(-1, Math.min(1, (e.clientX - rect.left) / rect.width * 2 - 1));
+          var y = Math.max(-1, Math.min(1, (e.clientY - rect.top) / rect.height * 2 - 1));
+          stage.style.setProperty('--px', x.toFixed(3));
+          stage.style.setProperty('--py', y.toFixed(3));
+        });
+      };
+      screen.addEventListener('pointermove', screen._qzParallax, { passive: true });
+    }
+    var submitBtn = form.querySelector('button[type=submit]');
+    var doLogin = function (identifier, password, sourceBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = '登录中...';
       errBox.style.display = 'none';
+      A.$$('.demo-chip', form).forEach(function (c) { c.disabled = true; });
+      if (sourceBtn) sourceBtn.classList.add('is-loading');
       fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identifier: identifier, password: password }) })
         .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || '登录失败'); return d; }); })
         .then(function (data) {
           A.state.token = data.token;
           LS.set('qz_admin_token', data.token);
+          A.state.pendingDashboard = true;
           A.boot();
         })
         .catch(function (err) {
           errBox.style.display = 'flex';
           errBox.textContent = err.message;
-          btn.disabled = false;
-          btn.textContent = '进入工作台';
+          submitBtn.disabled = false;
+          submitBtn.textContent = A.t('进入工作台');
+          A.$$('.demo-chip', form).forEach(function (c) { c.disabled = false; });
+          if (sourceBtn) sourceBtn.classList.remove('is-loading');
         });
+    };
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      doLogin(form.identifier.value.trim(), form.password.value);
     });
     A.$$('.demo-chip', form).forEach(function (chip) {
       chip.addEventListener('click', function () {
-        form.identifier.value = chip.getAttribute('data-email');
-        form.password.value = chip.getAttribute('data-pass');
-        form.dispatchEvent(new Event('submit'));
+        doLogin(chip.getAttribute('data-email'), chip.getAttribute('data-pass'), chip);
       });
     });
   };
@@ -433,6 +513,8 @@
       A.state.sites = me.sites || [];
       A.state.workspaces = me.workspaces || [];
       A.state.account = me.account || null;
+      if (window.I18N) I18N.setLocale(LS.get('qz_locale', '') || (me.account && me.account.locale) || 'zh-CN');
+      A.state.account = me.account || null;
       if (A.state.siteId && !A.state.sites.some(function (s) { return String(s.id) === String(A.state.siteId); })) {
         A.state.siteId = '';
         LS.del('qz_admin_site');
@@ -447,6 +529,10 @@
         window.addEventListener('hashchange', function () { A.route(); });
       }
       A.route();
+      if (A.state.pendingDashboard) {
+        A.state.pendingDashboard = false;
+        if (location.hash !== '#/dashboard') location.hash = '#/dashboard'; else A.route();
+      }
       A.pollNotifications();
       if (A.state.dark) document.documentElement.classList.add('au-dark');
     }).catch(function (err) {
@@ -469,10 +555,10 @@
         return !it.roles || it.roles.indexOf(A.role()) > -1;
       });
       if (!items.length) return '';
-      return '<div class="nav-group"><div class="nav-group-title">' + group.title + '</div>' + items.map(function (it) {
+      return '<div class="nav-group"><div class="nav-group-title">' + A.esc(A.t(group.title)) + '</div>' + items.map(function (it) {
         var locked = it.feature && !A.can(it.feature);
         return '<button class="nav-item' + (locked ? ' locked' : '') + '" data-nav="' + it.key + '">' +
-          '<span class="n-ico">' + A.icon(it.icon, 17) + '</span><span class="n-label">' + it.label + '</span>' +
+          '<span class="n-ico">' + A.icon(it.icon, 17) + '</span><span class="n-label">' + A.esc(A.t(it.label)) + '</span>' +
           (locked ? '<span class="n-lock">' + A.featureNeeded(it.feature) + '</span>' : '') +
           (it.badge === 'chat' && A.state.pendingConv ? '<span class="n-badge">' + (A.state.pendingConv > 99 ? '99+' : A.state.pendingConv) + '</span>' : '') +
           (it.badge === 'bell' && A.state.unread ? '<span class="n-badge">' + (A.state.unread > 99 ? '99+' : A.state.unread) + '</span>' : '') +
@@ -483,7 +569,7 @@
     var trialLeft = A.trialDaysLeft();
     var planBadge = trialLeft != null ? '试用 ' + trialLeft + ' 天' : usage;
     side.innerHTML =
-      '<div class="side-logo"><span class="side-logo-mark">' + A.icon('chat', 19) + '</span><span><b>轻站线索客服</b><small>Lead Chat Cloud</small></span></div>' +
+      '<div class="side-logo"><span class="side-logo-mark"><img src="/assets/logo.webp" alt=""></span><span><b>轻客服 SaaS</b><small>客服挂件 · 线索 CRM</small></span></div>' +
       (site ? '<div class="side-site" data-site-switch><span class="site-ico">' + A.icon('globe', 14) + '</span><span class="site-meta"><b>' + A.esc(site.name) + '</b><span>' + A.esc(site.domain || site.site_key) + '</span></span>' + A.icon('grid', 14) + '</div>' : '') +
       '<nav class="side-nav">' + navHtml + '</nav>' +
       '<div class="side-plan"><b><span>' + (A.state.plan ? A.state.plan.name : '') + '</span><span class="pill ' + (trialLeft != null ? 'orange' : 'blue') + '">' + planBadge + '</span></b>' +
@@ -515,14 +601,15 @@
     }).join('');
     top.innerHTML =
       '<button class="top-icon-btn menu-toggle" data-menu aria-label="菜单">' + A.icon('menu', 17) + '</button>' +
-      '<div class="topbar-title">' + A.esc(page.title || '数据概览') + '<small>' + A.esc(page.subtitle || '') + '</small></div>' +
+      '<div class="topbar-title">' + A.esc(A.t(page.title || '数据概览')) + '<small>' + A.esc(A.t(page.subtitle || '')) + '</small></div>' +
       '<div class="topbar-spacer"></div>' +
       '<div class="top-actions">' +
+      A.langSelectHtml() +
       '<select class="top-select" data-site-filter aria-label="选择站点">' + siteOptions + '</select>' +
       '<button class="top-icon-btn" data-density title="外观" aria-label="切换深浅色">' + A.icon(A.state.dark ? 'sun' : 'moon', 16) + '</button>' +
       '<button class="top-icon-btn" data-bell aria-label="通知">' + A.icon('bell', 16) + (A.state.unread ? '<span class="dot"></span>' : '') + '</button>' +
       '<button class="top-user" data-user>' +
-      '<span class="au-avatar">' + A.esc((A.state.user && A.state.user.name || '?').slice(0, 1)) + '</span>' +
+      A.avatarHtml(A.state.user, '', 15) +
       '<span><b>' + A.esc(A.state.user && A.state.user.name || '') + '</b><span class="role">' + ({ admin: '管理员', operator: '运营', agent: '客服' })[A.role()] + '</span></span>' +
       '</button></div>';
     top.querySelector('[data-menu]').addEventListener('click', function () {
@@ -540,6 +627,11 @@
       document.documentElement.classList.toggle('au-dark', A.state.dark);
       A.renderTopbar();
     });
+    var langSel = top.querySelector('[data-admin-lang]');
+    if (langSel) {
+      langSel.value = window.I18N ? I18N.locale : 'zh-CN';
+      langSel.addEventListener('change', function () { A.setLocale(langSel.value); });
+    }
     top.querySelector('[data-bell]').addEventListener('click', A.openNotifications);
     top.querySelector('[data-user]').addEventListener('click', A.openUserMenu);
   };
@@ -627,7 +719,7 @@
   A.openUserMenu = function () {
     var u = A.state.user;
     var body = '<div class="flex items-center gap-2" style="padding-bottom:14px;border-bottom:1px solid rgba(148,163,184,.2)">' +
-      '<span class="au-avatar au-avatar--lg">' + A.esc((u.name || '?').slice(0, 1)) + '</span>' +
+      A.avatarHtml(u, 'au-avatar--lg', 20) +
       '<div><b style="font-size:15px">' + A.esc(u.name) + '</b><div class="small muted">' + A.esc(u.email || (A.state.account && A.state.account.phone) || '') + '</div><div class="tag-list mt-1"><span class="pill blue">' + ({ admin: '管理员', operator: '运营', agent: '客服' })[u.role] + '</span><span class="pill gray">' + A.esc(A.state.tenant.name) + '</span></div></div></div>' +
       '<div class="mt-2"><div class="side-kv"><span>所属套餐</span><b>' + (A.state.plan ? A.state.plan.name : '') + '</b></div>' +
       '<div class="side-kv"><span>站点数量</span><b>' + A.state.sites.filter(function (s) { return !s.is_sandbox; }).length + '</b></div>' +
@@ -635,10 +727,11 @@
       (A.state.workspaces && A.state.workspaces.length > 1 ? '<div class="divider"></div><div class="field-label">切换工作空间</div><div class="grid" style="gap:6px">' + A.state.workspaces.map(function (w) {
         return '<button class="au-list-item' + (Number(w.tenant_id) === Number(A.state.tenant.id) ? ' au-active' : '') + '" data-ws="' + w.tenant_id + '" style="border:1px solid rgba(148,163,184,.18)"><span class="avatar-sm">' + A.icon('globe', 13) + '</span><span class="au-list-item-content"><span class="au-list-item-title">' + A.esc(w.tenant_name) + '</span><span class="au-list-item-desc">' + A.planName(w.plan) + ' · ' + w.role + '</span></span></button>';
       }).join('') + '</div>' : '') +
-      '<div class="flex gap-1 mt-3"><button class="au-btn au-btn--ghost" data-pwd style="flex:1">修改密码</button><button class="au-btn au-btn--danger" data-logout style="flex:1">退出登录</button></div>';
+      '<div class="grid" style="grid-template-columns:1fr 1fr;gap:8px;margin-top:12px"><button class="au-btn au-btn--ghost" data-profile>个人资料</button><button class="au-btn au-btn--ghost" data-pwd>修改密码</button><button class="au-btn au-btn--danger" data-logout style="grid-column:span 2">退出登录</button></div>';
     var m = A.modal({ title: '账号', body: body });
     m.el.querySelector('[data-logout]').addEventListener('click', function () { m.close(); A.logout(); });
     m.el.querySelector('[data-pwd]').addEventListener('click', function () { m.close(); A.openPassword(); });
+    m.el.querySelector('[data-profile]').addEventListener('click', function () { m.close(); A.openProfile(); });
     A.$$('[data-ws]', m.el).forEach(function (b) {
       b.addEventListener('click', function () {
         var tid = b.getAttribute('data-ws');
@@ -651,6 +744,36 @@
           location.reload();
         }).catch(A.handleError);
       });
+    });
+  };
+
+  A.openProfile = function () {
+    var u = A.state.user;
+    var selected = u.avatar || '';
+    var body = '<div class="grid"><div><label class="field-label">昵称</label><input class="az-input" data-profile-name maxlength="30" value="' + A.esc(u.name || '') + '"></div>' +
+      '<div><label class="field-label">选择头像</label><div class="avatar-picker">' + A.avatarDefs.map(function (a) {
+        return '<button type="button" class="avatar-choice' + (selected === a.id ? ' active' : '') + '" data-avatar="' + a.id + '">' + A.avatarHtml({ avatar: a.id, name: u.name }, '', 17) + '</button>';
+      }).join('') + '</div></div></div>';
+    var m = A.modal({
+      title: '个人资料', subtitle: '昵称与头像会显示在后台和团队列表',
+      body: body,
+      footer: [{ label: '取消', class: 'au-btn--ghost' }, { label: '保存资料', class: 'au-btn--primary', onClick: function (card, close) {
+        var name = card.querySelector('[data-profile-name]').value.trim();
+        if (!name) return A.toast('昵称不能为空', 'err');
+        A.apiPatch('/api/auth/profile', { name: name, avatar: selected }).then(function (res) {
+          A.state.user = res.user;
+          close();
+          A.renderTopbar();
+          A.renderSidebar();
+          A.toast('个人资料已更新', 'ok');
+        }).catch(A.handleError);
+      } }]
+    });
+    A.$$('[data-avatar]', m.el).forEach(function (b) {
+      b.onclick = function () {
+        selected = b.getAttribute('data-avatar');
+        A.$$('[data-avatar]', m.el).forEach(function (x) { x.classList.toggle('active', x === b); });
+      };
     });
   };
 

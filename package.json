@@ -2,7 +2,7 @@
   "name": "qingzhan-lead-chat",
   "version": "1.0.0",
   "private": true,
-  "description": "轻站线索客服 SaaS - 一段 JS 嵌入，客服 + 访客行为埋点 + 营销触达 + 轻线索 CRM 一体化",
+  "description": "轻客服 SaaS - 客服挂件 + 线索 CRM，一段 JS 接入网站",
   "main": "server/index.js",
   "scripts": {
     "start": "node --no-warnings server/index.js",

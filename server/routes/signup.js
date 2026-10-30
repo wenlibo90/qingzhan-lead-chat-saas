@@ -7,6 +7,7 @@ const { publicUser, tenantPublic } = require('../helpers');
 const { featuresOf, planOf, FEATURES } = require('../plans');
 const { hit } = require('../services/ratelimit');
 const { createWorkspace, assessRisk } = require('../services/provision');
+const referral = require('../services/referral');
 
 const router = express.Router();
 const SECRET = process.env.APP_SECRET || 'qingzhan-leadchat-dev-secret-2026';
@@ -63,6 +64,7 @@ router.post('/register', (req, res) => {
   const name = String(b.name || `用户${phone.slice(-4)}`).trim().slice(0, 30);
   const workspaceName = String(b.workspaceName || '我的工作空间').trim().slice(0, 60);
   const ip = clientIp(req);
+  const locale = ['zh-CN', 'zh-TW', 'en', 'ja', 'ko'].includes(b.locale) ? b.locale : 'zh-CN';
   if (!validPhone(phone)) return res.status(400).json({ error: '请输入正确的手机号' });
   if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: '请输入 6 位验证码' });
   if (password.length < 6) return res.status(400).json({ error: '密码至少 6 位' });
@@ -80,9 +82,10 @@ router.post('/register', (req, res) => {
   try {
     const result = createWorkspace({
       workspaceName, ownerName: name, phone, password,
-      plan: 'pro', planStatus: 'trialing', source: 'self_signup', ip, trialDays: 14, withSite: false
+      plan: 'pro', planStatus: 'trialing', source: 'self_signup', ip, trialDays: 14, withSite: false, locale
     });
     const token = signToken(result.user);
+    if (b.ref) referral.recordReferral({ code: b.ref, referredAccountId: result.account.id, ip });
     run('INSERT INTO audit_logs (tenant_id, user_id, action, target, detail, ip) VALUES (?,?,?,?,?,?)', [result.tenant.id, result.user.id, 'signup', phone, '自助注册并创建工作空间', ip]);
     run('INSERT INTO platform_audit_logs (action, target, detail, ip) VALUES (?,?,?,?)', ['account.signup', `account:${result.account.id}`, `${workspaceName} / ${phone}`, ip]);
     res.json({

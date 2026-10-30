@@ -34,6 +34,8 @@ graph LR
 | 订阅 | `services/billing.js` + `routes/payments.js` | 订单计价、模拟支付、回调验签、幂等开通、续费与降级 |
 | 工单 | `routes/support.js` | 客户提交、追加回复、关闭工单；运营后台回复与状态流转 |
 | PQL | `services/pql.js` | 安装、访客、会话、线索与团队成员阈值自动生成销售线索 |
+| 推广 | `services/referral.js` + `routes/referral.js` | 推广码、短链归因、首单佣金、奖励结算与提现 |
+| 国际化 | `public/i18n.js` + `widget-core.js` 语言包 | 简中/繁中/英/日/韩核心界面与挂件静态文案 |
 | 开通 | `services/provision.js` | 账号 + 工作空间 + 可选站点的事务化开通 |
 | 生命周期 | `services/lifecycle.js` | 试用到期降级免费版并保留数据 |
 | 公开 | `routes/public.js` | 访客配置、会话、追踪、触发、表单、离线留言、评价、录屏、上传、广告拦截 |
@@ -55,7 +57,7 @@ graph LR
 
 | 表 | 关键字段 | 说明 |
 | --- | --- | --- |
-| `accounts` | phone, email, password_hash, status, signup_source, signup_ip, risk_score | 登录身份，支持手机号/邮箱 |
+| `accounts` | phone, email, password_hash, status, signup_source, referral_code, locale, risk_score | 登录身份、推广码与语言偏好 |
 | `tenants` | name, plan, plan_status, trial_*, signup_source, risk_score, onboarding_state | 工作空间、套餐、试用与激活状态 |
 | `users` | tenant_id, account_id, email, phone, role, status | 账号在工作空间内的成员关系与 RBAC |
 | `sites` | tenant_id, site_key, loader_token, installed_at, last_widget_ping_at | 客户网站、加载令牌与安装检测 |
@@ -67,6 +69,10 @@ graph LR
 | `orders` | order_no, tenant_id, plan, cycle, amount_cents, status, provider, invoice_no | 自助订单与发票记录 |
 | `payment_events` | event_id, order_id, amount_cents, status, raw | 支付回调幂等与审计 |
 | `support_tickets` | tenant_id, subject, category, priority, status | 客户支持工单 |
+| `referrals` | referrer_account_id, referred_account_id, code, status | 推广归因与生命周期 |
+| `referral_visits` | code, ip, ua | 邀请短链访问统计 |
+| `referral_rewards` | referrer_account_id, referral_id, order_id, amount_cents, status | 首单佣金与结算状态 |
+| `referral_withdrawals` | account_id, amount_cents, status | 提现申请与运营审核 |
 | `ticket_messages` | ticket_id, sender_type, sender_id, content | 工单对话 |
 | `api_keys` | tenant_id, key, enabled | 企业版开放 API |
 | `audit_logs` | tenant_id, user_id, action, target, ip | 客户侧审计 |
@@ -186,7 +192,7 @@ sequenceDiagram
     API-->>S: Token + 试用信息
     S->>U: 跳转 /admin/#/onboarding
     U->>W: 在站点管理添加自己的网站
-    W-->>U: Site Key + 一段 JS
+    W-->>U: 加载令牌 + 一段 JS
     U->>W: 复制 JS 到真实网站
     W->>API: GET /api/public/config
     API->>W: 写入 installed_at
@@ -237,6 +243,29 @@ sequenceDiagram
 3. 客户追加回复后状态回到 `open`。
 4. 双方可标记已解决/关闭；运营可调整优先级。
 
+### 4.10 推广激励
+
+```mermaid
+sequenceDiagram
+    participant A as 老客户
+    participant V as 新访客
+    participant API as 服务端
+    participant O as 平台运营
+    A->>A: 在推广中心获取 /r/:code 短链
+    V->>API: 打开短链，记录访问并跳转 /signup?ref=code
+    V->>API: 注册，写入 referrals(registered)
+    API->>API: 被邀请人安装 JS 后激活，首单支付后生成 20% 奖励
+    API->>A: 7 天后奖励转为可提现
+    A->>API: 提交提现申请
+    O->>API: 审核通过、拒绝或标记打款
+```
+
+奖励只按被邀请人首次付费订单计算，退款订单作废；提现最低 100 元，由运营人工审核。推广数据独立于客户的线索 CRM。
+
+### 4.11 国际化
+
+`public/i18n.js` 提供五种语言：`zh-CN`、`zh-TW`、`en`、`ja`、`ko`。落地页、注册页、后台登录/导航、个人资料和公开推广页使用 `data-i18n` 与 `I18N.t()`；后台语言选择写入 `accounts.locale` 并持久化。访客挂件使用站点配置 `widget.locale`，静态 UI 文案来自 `widget-core.js` 内置语言包，客户输入、知识库与客服消息保持原文。
+
 ## 5. REST 接口规划
 
 ### 5.1 公开接口
@@ -260,7 +289,14 @@ sequenceDiagram
 | POST | `/api/public/blacklist-check` | 黑名单校验 |
 | POST | `/api/public/adblock` | 拦截上报 |
 
-### 5.2 运营接口
+### 5.2 运营推广接口
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/ops/referrals` | 推荐关系、奖励、提现与汇总 |
+| PATCH | `/api/ops/referral-withdrawals/:id` | 通过、拒绝或标记打款 |
+
+### 5.3 运营接口
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -275,7 +311,7 @@ sequenceDiagram
 | GET/POST/PATCH | `/api/ops/team` | 平台成员管理（超级管理员） |
 | GET | `/api/ops/audit-logs` | 平台操作审计 |
 
-### 5.3 订阅与工单
+### 5.4 订阅与工单
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -286,6 +322,9 @@ sequenceDiagram
 | POST | `/api/billing/downgrade` | 降级免费版或预约到期降级 |
 | POST | `/api/billing/resume` | 取消到期降级设置 |
 | POST | `/api/billing/contact-sales` | 企业版/定制咨询转销售线索 |
+| GET | `/api/referral` | 推广中心：链接、归因、奖励、提现与余额 |
+| POST | `/api/referral/withdrawals` | 提交推广提现申请（最低 ¥100） |
+| GET | `/r/:code` | 推广短链，记录访问并跳转注册 |
 | GET/POST | `/api/support/tickets` | 客户工单列表与新建 |
 | GET | `/api/support/tickets/:id` | 工单详情与消息 |
 | POST | `/api/support/tickets/:id/messages` | 客户追加回复 |
@@ -293,7 +332,7 @@ sequenceDiagram
 | GET/PATCH | `/api/ops/tickets` | 运营工单列表、状态与优先级 |
 | POST | `/api/ops/tickets/:id/messages` | 运营回复工单 |
 
-### 5.4 后台接口
+### 5.5 后台接口
 
 | 分组 | 代表路径 |
 | --- | --- |
@@ -303,7 +342,7 @@ sequenceDiagram
 | 访客 | `GET /api/visitors`、`GET /api/visitors/:id`、`PATCH /api/visitors/:id`、`POST /api/visitors/:id/tags`、`POST /api/visitors/:id/merge` |
 | 线索 | `GET/POST /api/leads`、`PATCH /api/leads/:id`、`POST /api/leads/:id/followups`、`GET /api/leads/export.csv` |
 | 报表 | `/api/reports/sources`、`/funnel`、`/agents`、`/geo`、`/churn` |
-| 站点 | `GET/POST /api/sites`、`PATCH /api/sites/:id`、`POST /api/sites/:id/rotate-key` |
+| 站点 | `GET/POST /api/sites`、`PATCH/DELETE /api/sites/:id`、`POST /api/sites/:id/rotate-key` |
 | 表单 | `GET/POST /api/forms`、`PATCH/DELETE /api/forms/:id` |
 | 规则 | `GET/POST /api/rules`、`PATCH/DELETE /api/rules/:id` |
 | 知识库 | `/api/faqs`、`/api/faq-categories`、`/api/knowledge-files` |
@@ -312,7 +351,7 @@ sequenceDiagram
 | 系统 | `/api/settings`、`/api/billing`、`/api/api-keys`、`/api/notification-channels`、`/api/notifications`、`/api/audit-logs` |
 | AI | `/api/ai/overview`、`/api/ai/summary/:id`、`/api/ai/translate`、`/api/ai/test-answer` |
 
-### 5.3 开放 API（企业版）
+### 5.6 开放 API（企业版）
 
 `x-api-key` 认证，租户由 Key 推导：
 

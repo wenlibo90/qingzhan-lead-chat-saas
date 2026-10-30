@@ -262,7 +262,7 @@ router.post('/notification-channels/:id/test', requireRole('admin', 'operator'),
   const c = get('SELECT * FROM notification_channels WHERE id = ? AND tenant_id = ?', [Number(req.params.id), req.tenant.id]);
   if (!c) return res.status(404).json({ error: '渠道不存在' });
   const { pushWebhook } = require('../services/notify');
-  const ok = await pushWebhook(c, { title: '轻站线索客服测试消息', content: '如果你看到这条消息，说明 webhook 配置成功。' });
+  const ok = await pushWebhook(c, { title: '轻客服 SaaS 测试消息', content: '如果你看到这条消息，说明 webhook 配置成功。' });
   res.json({ ok, message: ok ? '测试消息已发送' : '发送失败，请检查 Webhook 地址' });
 });
 

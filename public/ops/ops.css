@@ -1,7 +1,6 @@
 .ops-sidebar { background: linear-gradient(180deg,#0b1220,#0f1c35); border-right: 1px solid rgba(148,163,184,.14); }
 .ops-sidebar .side-logo b, .ops-sidebar .side-logo small { color: #e2e8f0; }
 .ops-sidebar .side-logo small { color: #64748b; }
-.ops-sidebar .side-logo-mark { background: linear-gradient(135deg,#8b5cf6,#2563eb); }
 .ops-sidebar .nav-group-title { color: #475569; }
 .ops-sidebar .nav-item { color: #94a3b8; }
 .ops-sidebar .nav-item:hover { background: rgba(255,255,255,.06); color: #e2e8f0; }
@@ -13,21 +12,10 @@
 .ops-sidebar .side-site .site-meta b { color: #e2e8f0; }
 .ops-sidebar .side-site .site-meta span { color: #64748b; }
 .ops-brand-sub { font-size: 9px; color: #7c3aed; letter-spacing: .1em; }
-.ops-login { min-height: 100vh; display: grid; grid-template-columns: 1.05fr .95fr; }
-.ops-login-brand { padding: 64px; color: #fff; background: radial-gradient(circle at 20% 10%, rgba(139,92,246,.4), transparent 36%), radial-gradient(circle at 80% 82%, rgba(37,99,235,.35), transparent 36%), linear-gradient(140deg,#0b1220,#111c36 55%,#1e1b4b); display: flex; flex-direction: column; }
-.ops-login-brand .brand { display: flex; gap: 10px; align-items: center; font-size: 17px; font-weight: 800; }
-.ops-login-brand .mark { width: 38px; height: 38px; border-radius: 11px; background: linear-gradient(135deg,#8b5cf6,#2563eb); display: grid; place-items: center; }
-.ops-login-brand h1 { margin: auto 0 0; font-size: 44px; line-height: 1.12; letter-spacing: -.04em; }
-.ops-login-brand p { color: #94a3b8; font-size: 13.5px; line-height: 1.85; max-width: 480px; }
-.ops-login-brand ul { list-style: none; padding: 0; margin: 22px 0 0; display: flex; flex-direction: column; gap: 10px; color: #cbd5e1; font-size: 12px; }
-.ops-login-brand li::before { content: "·"; color: #a78bfa; margin-right: 7px; font-weight: 800; }
-.ops-login-form { display: grid; place-items: center; padding: 32px; }
-.ops-login-card { width: min(400px,100%); background: rgba(255,255,255,.9); border: 1px solid rgba(148,163,184,.25); border-radius: 24px; padding: 34px; box-shadow: 0 30px 80px rgba(15,23,42,.16); }
-.ops-login-card h2 { margin: 0 0 6px; font-size: 23px; letter-spacing: -.03em; }
-.ops-login-card p { margin: 0 0 22px; font-size: 12px; color: var(--au-muted); }
-.ops-login-card .au-input { padding: 11px 13px; }
-.ops-demo { margin-top: 18px; padding-top: 16px; border-top: 1px dashed rgba(148,163,184,.3); font-size: 10.5px; color: #94a3b8; }
-.ops-demo b { color: #475569; }
+.ops-brand-pill { display: inline-flex; align-items: center; margin-left: 6px; padding: 3px 8px; border: 1px solid rgba(255,255,255,.24); border-radius: 999px; background: rgba(255,255,255,.16); font-size: 10px; font-weight: 700; letter-spacing: .02em; }
+.ops-login-note { margin: 0; padding: 16px 18px; border: 1px solid rgba(255,255,255,.18); border-radius: 16px; background: rgba(8,20,45,.24); backdrop-filter: blur(10px); }
+.ops-login-note b { display: block; margin-bottom: 4px; color: #fff; font-size: 12.5px; }
+.ops-login-note span { color: #dbeafe; font-size: 11.5px; line-height: 1.7; opacity: .86; }
 .ops-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: rgba(139,92,246,.1); color: #7c3aed; }
 .ops-metric-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; }
 .ops-metric { background: rgba(255,255,255,.8); border: 1px solid rgba(148,163,184,.22); border-radius: 16px; padding: 17px; box-shadow: 0 8px 22px rgba(15,23,42,.04); }
@@ -58,4 +46,4 @@
 .ops-pager { display: flex; gap: 4px; justify-content: flex-end; padding: 12px 16px; }
 .ops-callout { background: rgba(139,92,246,.06); border: 1px solid rgba(139,92,246,.18); color: #6d28d9; border-radius: 11px; padding: 11px 13px; font-size: 11.5px; line-height: 1.7; }
 @media (max-width: 1200px) { .ops-metric-grid { grid-template-columns: repeat(2,1fr); } }
-@media (max-width: 900px) { .ops-login { grid-template-columns: 1fr; } .ops-login-brand { display: none; } .ops-detail-grid { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .ops-detail-grid { grid-template-columns: 1fr; } }

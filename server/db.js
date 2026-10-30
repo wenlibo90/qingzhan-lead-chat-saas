@@ -35,6 +35,20 @@ ensureColumn('tenants', 'current_period_start', 'TEXT');
 ensureColumn('tenants', 'current_period_end', 'TEXT');
 ensureColumn('tenants', 'cancel_at_period_end', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('tenants', 'last_payment_at', 'TEXT');
+ensureColumn('accounts', 'referral_code', 'TEXT');
+ensureColumn('accounts', 'locale', "TEXT NOT NULL DEFAULT 'zh-CN'");
+try {
+  const accountRows = db.prepare('SELECT id, referral_code FROM accounts').all();
+  const used = new Set(accountRows.map((a) => a.referral_code).filter(Boolean));
+  for (const account of accountRows) {
+    if (account.referral_code && /^[A-F0-9]{8}$/.test(account.referral_code)) continue;
+    let code;
+    do { code = crypto.randomBytes(4).toString('hex').toUpperCase(); } while (used.has(code));
+    used.add(code);
+    db.prepare('UPDATE accounts SET referral_code = ? WHERE id = ?').run(code, account.id);
+  }
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_referral_code ON accounts(referral_code)');
+} catch (e) { /* migration must not block startup */ }
 ensureColumn('sites', 'is_sandbox', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('sites', 'installed_at', 'TEXT');
 ensureColumn('sites', 'last_widget_ping_at', 'TEXT');

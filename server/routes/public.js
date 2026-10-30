@@ -167,6 +167,7 @@ function sanitizeWidget(site, plan) {
     businessHours: w.businessHours || '09:00-21:00',
     aiEnabled: licensed.aiBot && !!w.aiEnabled,
     aiName: w.aiName || 'AI 助手',
+    locale: ['zh-CN', 'zh-TW', 'en', 'ja', 'ko'].includes(w.locale) ? w.locale : 'zh-CN',
     languages: licensed.translation ? (w.languages || ['zh-CN', 'en-US']) : ['zh-CN'],
     compliance: {
       enabled: !!site.compliance_enabled,

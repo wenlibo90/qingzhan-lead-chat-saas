@@ -1,6 +1,7 @@
 'use strict';
 const { all, get, run, json } = require('../db');
 const pql = require('./pql');
+const referral = require('./referral');
 
 function notifyTenantOnce(tenantId, type, title, content, payload) {
   const rows = all("SELECT payload FROM notifications WHERE tenant_id = ? AND type = ? AND created_at >= datetime('now','-14 days')", [tenantId, type]);
@@ -67,7 +68,9 @@ function runLifecycle() {
   const reminders = sendTrialReminders();
   const subsExpired = expireSubscriptions();
   const pqls = pql.evaluateAll();
-  return { trialsExpired, reminders, subsExpired, pqls: pqls.length };
+  const referralsActivated = referral.syncActivated();
+  const rewardsAvailable = referral.makeRewardsAvailable();
+  return { trialsExpired, reminders, subsExpired, pqls: pqls.length, referralsActivated, rewardsAvailable };
 }
 
 function startLifecycle() {

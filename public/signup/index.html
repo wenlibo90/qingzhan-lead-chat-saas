@@ -3,54 +3,58 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>免费注册 · 轻站线索客服</title>
-  <meta name="description" content="注册轻站线索客服账号，在自己的网站接入客服、访客分析、主动触达与线索 CRM。">
+  <title>免费注册 · 轻客服 SaaS</title>
+  <meta name="description" content="注册轻客服 SaaS 账号，在自己的网站接入客服挂件、访客分析与线索 CRM。">
   <link rel="stylesheet" href="/assets/apollo-ui.css">
   <link rel="stylesheet" href="/signup/signup.css">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%232563eb'/%3E%3Cpath d='M9 11.5A3.5 3.5 0 0 1 12.5 8h7A3.5 3.5 0 0 1 23 11.5v5a3.5 3.5 0 0 1-3.5 3.5H15l-4.5 3v-3h-1.5A3.5 3.5 0 0 1 9 16.5z' fill='white'/%3E%3C/svg%3E">
+  <link rel="icon" type="image/webp" href="/assets/logo.webp">
 </head>
 <body>
   <header class="signup-nav">
     <a class="s-brand" href="/">
-      <span class="s-mark"><svg viewBox="0 0 32 32" width="20" height="20"><rect width="32" height="32" rx="9" fill="currentColor" opacity=".18"/><path d="M9 11.5A3.5 3.5 0 0 1 12.5 8h7A3.5 3.5 0 0 1 23 11.5v5a3.5 3.5 0 0 1-3.5 3.5H15l-4.5 3v-3h-1.5A3.5 3.5 0 0 1 9 16.5z" fill="currentColor"/></svg></span>
-      <span><b>轻站线索客服</b><small>LEAD CHAT CLOUD</small></span>
+      <span class="s-mark"><img src="/assets/logo.webp" alt="轻客服 SaaS"></span>
+      <span><b data-i18n="brand">轻客服 SaaS</b><small data-i18n="brandSub">客服挂件 · 线索 CRM</small></span>
     </a>
-    <div class="s-nav-actions"><span>已有账号？</span><a class="s-login" href="/admin/">登录后台</a></div>
+    <div class="s-nav-actions"><select class="lang-select" data-lang-select><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option><option value="en">English</option><option value="ja">日本語</option><option value="ko">한국어</option></select><span data-i18n="already">已有账号？</span><a class="s-login" href="/admin/" data-i18n="login">登录后台</a></div>
   </header>
 
   <main class="signup-main">
     <section class="signup-left">
-      <div class="s-eyebrow"><span class="s-dot"></span>免费注册 · 14 天专业版试用</div>
-      <h1>注册一个账号<br>把<span>自己的网站</span>接进来</h1>
-      <p class="s-sub">注册只需要手机号和密码。进入后台后添加你的网站，复制一段 JS 放到自己的页面，真实访客就能看到客服挂件、行为轨迹和线索表单。</p>
+      <div class="s-eyebrow"><span class="s-dot"></span><span data-i18n="免费注册 · 14 天专业版试用">免费注册 · 14 天专业版试用</span></div>
+      <h1 data-i18n-html="signupHero">注册一个账号<br>把<span>自己的网站</span>接进来</h1>
+      <p class="s-sub" data-i18n="signupSubHero">注册只需要手机号和密码。进入后台后添加你的网站，复制一段 JS 放到自己的页面，真实访客就能看到客服挂件、行为轨迹和线索表单。</p>
       <div class="s-benefits">
-        <div><span>01</span><b>注册只要 30 秒</b><p>手机号、验证码、密码，不询问网站信息，不阻断注册。</p></div>
-        <div><span>02</span><b>后台添加自己的网站</b><p>登录后添加域名、生成 Site Key，自己控制站点。</p></div>
-        <div><span>03</span><b>直接跑真实场景</b><p>把 JS 放到自己的网站，访客咨询、轨迹和线索实时进入后台。</p></div>
+        <div><span>01</span><b data-i18n="signupB1">注册只要 30 秒</b><p data-i18n="signupB1d">手机号、验证码、密码，不询问网站信息，不阻断注册。</p></div>
+        <div><span>02</span><b data-i18n="signupB2">后台添加自己的网站</b><p data-i18n="signupB2d">登录后添加域名、生成加载令牌，自己控制站点。</p></div>
+        <div><span>03</span><b data-i18n="signupB3">直接跑真实场景</b><p data-i18n="signupB3d">把 JS 放到自己的网站，访客咨询、轨迹和线索实时进入后台。</p></div>
       </div>
       <div class="s-quote">
-        <p>“个人站长需要的是一段能马上跑起来的代码，不是一套复杂的开通流程。”</p>
-        <span>轻站线索客服 · 为个人网站和小团队设计</span>
+        <p data-i18n="signupQuote">“个人站长需要的是一段能马上跑起来的代码，不是一套复杂的开通流程。”</p>
+        <span data-i18n="signupQuoteBy">轻客服 SaaS · 为个人网站和小团队设计</span>
       </div>
-      <div class="s-foot">需要团队演示或私有化？<a href="/#trial">预约顾问</a></div>
+      <div class="s-foot"><span data-i18n="teamDemo">需要团队演示或私有化？</span><a href="/#trial" data-i18n="bookAdvisor">预约顾问</a></div>
     </section>
 
     <section class="signup-right">
       <div class="signup-card">
-        <div class="s-card-head"><h2>创建账号</h2><p>手机号用于登录和接收接入提醒，不会对外展示。</p></div>
+        <div class="s-card-head"><h2 data-i18n="signupTitle">创建账号</h2><p data-i18n="signupSub">手机号用于登录和接收接入提醒，不会对外展示。</p></div>
+        <div class="s-ref-banner" id="ref-banner" data-ref-banner hidden>你正在通过好友邀请注册，首单付费后邀请人将获得推广奖励。</div>
         <form id="signup-form">
-          <div class="s-field"><label>手机号</label><div class="s-phone-row"><input name="phone" type="tel" maxlength="11" placeholder="请输入 11 位手机号" autocomplete="tel"><button type="button" class="s-code-btn" id="send-code">获取验证码</button></div><div class="s-hint" id="code-hint"></div></div>
-          <div class="s-field"><label>验证码</label><input name="code" type="text" maxlength="6" placeholder="6 位短信验证码" inputmode="numeric" autocomplete="one-time-code"></div>
-          <div class="s-field"><label>设置密码</label><input name="password" type="password" minlength="6" placeholder="至少 6 位，用于登录后台" autocomplete="new-password"></div>
-          <div class="s-agree"><label><input type="checkbox" name="agree" checked> 我已阅读并同意 <a href="/privacy.html" target="_blank">隐私政策</a> 与 <a href="#" onclick="return false">服务条款</a></label></div>
-          <button class="s-primary" type="submit" id="submit-btn">注册并进入后台</button>
-          <div class="s-error" id="form-error"></div>
-          <div class="s-login-hint">已经有账号？<a href="/admin/">直接登录</a></div>
+          <input type="hidden" name="ref" id="ref-code">
+          <div class="s-field"><label data-i18n="phone">手机号</label><div class="s-phone-row"><input name="phone" type="tel" maxlength="11" placeholder="请输入 11 位手机号" data-i18n-placeholder="phonePlaceholder" autocomplete="tel"><button type="button" class="s-code-btn" id="send-code" data-send-code data-i18n="sendCode">获取验证码</button></div><div class="s-hint" id="code-hint" data-code-hint></div></div>
+          <div class="s-field"><label data-i18n="code">验证码</label><input name="code" type="text" maxlength="6" placeholder="6 位短信验证码" data-i18n-placeholder="codePlaceholder" inputmode="numeric" autocomplete="one-time-code"></div>
+          <div class="s-field"><label data-i18n="password">设置密码</label><input name="password" type="password" minlength="6" placeholder="至少 6 位，用于登录后台" data-i18n-placeholder="passwordPlaceholder" autocomplete="new-password"></div>
+          <div class="s-agree"><label><input type="checkbox" name="agree" checked> <span data-i18n="agree">我已阅读并同意</span> <a href="/privacy.html" target="_blank" data-i18n="privacy">隐私政策</a> <span data-i18n="与">与</span> <a href="#" onclick="return false" data-i18n="terms">服务条款</a></label></div>
+          <button class="s-primary" type="submit" id="submit-btn" data-submit data-i18n="submitRegister">注册并进入后台</button>
+          <div class="s-error" id="form-error" data-error></div>
+          <div class="s-login-hint"><span data-i18n="loginHint">已经有账号？</span><a href="/admin/" data-i18n="directLogin">直接登录</a></div>
         </form>
       </div>
-      <div class="s-trust"><span>注册后添加自己的网站</span><span>数据按工作空间隔离</span><span>可随时导出线索</span></div>
+      <div class="s-trust"><span data-i18n="signupTrust1">注册后添加自己的网站</span><span data-i18n="signupTrust2">数据按工作空间隔离</span><span data-i18n="signupTrust3">可随时导出线索</span></div>
     </section>
   </main>
+  <script src="/i18n.js"></script>
+  <script src="/assets/signup-form.js"></script>
   <script src="/signup/signup.js"></script>
 </body>
 </html>

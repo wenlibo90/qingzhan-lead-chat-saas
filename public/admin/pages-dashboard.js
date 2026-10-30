@@ -97,7 +97,11 @@
       }).join('') : '<tr><td colspan="5">' + A.empty('暂无会话', '访客打开挂件后会自动出现在这里') + '</td></tr>';
 
       var recentCard = '<div class="az-card"><div class="az-card-head"><div><h3>最近会话</h3><div class="sub">优先处理待接入会话</div></div><button class="au-btn au-btn--ghost au-btn--xs" onclick="Admin.go(\'conversations\')">进入接待</button></div><div class="az-card-body flush"><div class="table-wrap"><table class="az-table compact"><thead><tr><th>访客</th><th>主题</th><th>客服</th><th>状态</th><th>时间</th></tr></thead><tbody>' + recentRows + '</tbody></table></div></div></div>';
-      body.innerHTML = (A.trialDaysLeft() != null ? '<div class="notice warn mb-2">' + A.icon('clock', 14) + '<span>专业版试用剩余 <b>' + A.trialDaysLeft() + '</b> 天，到期自动降级免费版，数据完整保留。 <a href="#/billing">查看套餐</a></span></div>' : '') + metricHtml +
+      var trialKey = 'qz_trial_dismiss_' + A.state.tenant.id + '_' + (A.state.tenant.trial_ends_at || '');
+      var trialDismissed = false;
+      try { trialDismissed = localStorage.getItem(trialKey) === '1'; } catch (e) { }
+      var trialBanner = A.trialDaysLeft() != null && !trialDismissed ? '<div class="notice warn mb-2" data-trial-banner>' + A.icon('clock', 14) + '<span>专业版试用剩余 <b>' + A.trialDaysLeft() + '</b> 天，到期自动降级免费版，数据完整保留。 <a href="#/billing">查看套餐</a></span><button class="notice-close" data-dismiss-trial aria-label="关闭">&times;</button></div>' : '';
+      body.innerHTML = trialBanner + metricHtml +
         '<div class="grid g-2-1 section-gap">' + trendCard + '<div class="grid" style="gap:16px">' + onlineCard + planCard + '</div></div>' +
         '<div class="grid grid-start section-gap" style="gap:16px;grid-template-columns:1fr 1fr 1.2fr">' +
           funnelMini +
@@ -118,6 +122,12 @@
           sourceBox.innerHTML = A.donut(top.map(function (s) { return { name: s.source, value: s.visitors }; }), { centerLabel: '访客' });
         }).catch(function () { sourceBox.innerHTML = ''; });
       }
+      var dismissTrial = body.querySelector('[data-dismiss-trial]');
+      if (dismissTrial) dismissTrial.onclick = function () {
+        try { localStorage.setItem(trialKey, '1'); } catch (e) { }
+        var banner = body.querySelector('[data-trial-banner]');
+        if (banner) banner.remove();
+      };
       A.$$('[data-metric]', body).forEach(function (btn) {
         btn.addEventListener('click', function () { st.metric = btn.getAttribute('data-metric'); renderDash(root); });
       });

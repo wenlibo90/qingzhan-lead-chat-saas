@@ -1,7 +1,7 @@
 'use strict';
 const { db, run, get, all, tx } = require('./db');
 const { hashPassword, signApiKey } = require('./auth');
-const { createWorkspace, loaderToken } = require('./services/provision');
+const { createWorkspace, loaderToken, referralCode } = require('./services/provision');
 
 function pad(n) { return String(n).padStart(2, '0'); }
 function fmt(d) {
@@ -99,7 +99,7 @@ const REQUIREMENTS = [
 ];
 
 function clear() {
-  const tables = ['ticket_messages', 'support_tickets', 'payment_events', 'orders', 'application_activities', 'applications', 'platform_audit_logs', 'sms_codes', 'platform_users', 'visitor_tags', 'follow_ups', 'leads', 'form_submissions', 'forms', 'messages', 'conversations', 'events', 'pageviews', 'visitor_sessions', 'recordings', 'visitors', 'faqs', 'faq_categories', 'knowledge_files', 'rules', 'rule_logs', 'canned_replies', 'tags', 'blacklist', 'announcements', 'notifications', 'notification_channels', 'api_keys', 'audit_logs', 'sites', 'users', 'accounts', 'tenants'];
+  const tables = ['referral_withdrawals', 'referral_rewards', 'referral_visits', 'referrals', 'ticket_messages', 'support_tickets', 'payment_events', 'orders', 'application_activities', 'applications', 'platform_audit_logs', 'sms_codes', 'platform_users', 'visitor_tags', 'follow_ups', 'leads', 'form_submissions', 'forms', 'messages', 'conversations', 'events', 'pageviews', 'visitor_sessions', 'recordings', 'visitors', 'faqs', 'faq_categories', 'knowledge_files', 'rules', 'rule_logs', 'canned_replies', 'tags', 'blacklist', 'announcements', 'notifications', 'notification_channels', 'api_keys', 'audit_logs', 'sites', 'users', 'accounts', 'tenants'];
   for (const t of tables) db.exec(`DELETE FROM ${t}`);
   db.exec("DELETE FROM sqlite_sequence");
 }
@@ -114,8 +114,8 @@ function createTenant(name, plan, brand) {
 function createUser(tenantId, email, userName, password, role, phone) {
   const hash = hashPassword(password);
   const accountId = run(
-    'INSERT INTO accounts (phone, email, name, password_hash, signup_source) VALUES (?,?,?,?,?)',
-    [phone || null, email, userName, hash, 'seed']
+    'INSERT INTO accounts (phone, email, name, password_hash, signup_source, referral_code) VALUES (?,?,?,?,?,?)',
+    [phone || null, email, userName, hash, 'seed', referralCode()]
   ).lastInsertRowid;
   return run(
     'INSERT INTO users (tenant_id, account_id, email, phone, name, password_hash, role, avatar) VALUES (?,?,?,?,?,?,?,?)',
@@ -126,6 +126,7 @@ function createUser(tenantId, email, userName, password, role, phone) {
 function defaultWidget(overrides = {}) {
   return {
     primaryColor: '#2563eb',
+    locale: 'zh-CN',
     position: 'right',
     offsetBottom: 24,
     offsetSide: 24,
@@ -567,6 +568,16 @@ run("INSERT INTO ticket_messages (ticket_id, sender_type, sender_id, sender_name
 const t2Ticket = run("INSERT INTO support_tickets (tenant_id, user_id, subject, category, priority, status, last_message_at) VALUES (?,?,?,?,?,?,datetime('now','-1 day'))", [self2.tenant.id, self2.user.id, '发票抬头需要修改', 'billing', 'normal', 'pending']).lastInsertRowid;
 run("INSERT INTO ticket_messages (ticket_id, sender_type, sender_id, sender_name, content, created_at) VALUES (?,?,?,?,?,datetime('now','-1 day'))", [t2Ticket, 'tenant', self2.user.id, self2.user.name, '麻烦把发票抬头改成「海纳跨境电子商务有限公司」。']);
 run("INSERT INTO ticket_messages (ticket_id, sender_type, sender_id, sender_name, content, created_at) VALUES (?,?,?,?,?,datetime('now','-20 hours'))", [t2Ticket, 'platform', platformSales, '销售顾问', '已登记，下一张发票会使用新的抬头。']);
+const paidOrder = get("SELECT id FROM orders WHERE order_no = 'QZ20261030SEED001'");
+const ref1 = run("INSERT INTO referrals (referrer_account_id, referred_account_id, code, status, ip, created_at, activated_at, paid_at) VALUES (?,?,?,?,?,datetime('now','-12 days'),datetime('now','-11 days'),datetime('now','-9 days'))",
+  [self1.account.id, self2.account.id, self1.account.referral_code, 'paid', '127.0.0.1']).lastInsertRowid;
+run("INSERT INTO referral_rewards (referrer_account_id, referral_id, order_id, amount_cents, rate, status, available_at, created_at) VALUES (?,?,?,?,?,?,datetime('now','-1 day'),datetime('now','-9 days'))",
+  [self1.account.id, ref1, paidOrder.id, 5980, 20, 'available']);
+run("INSERT INTO referral_withdrawals (account_id, amount_cents, status, note, created_at) VALUES (?,?,?,?,datetime('now','-2 hours'))", [self1.account.id, 3000, 'requested', '演示提现申请']);
+run("INSERT INTO referrals (referrer_account_id, referred_account_id, code, status, ip, created_at) VALUES (?,?,?,?,?,datetime('now','-4 days'))", [self1.account.id, self3.account.id, self1.account.referral_code, 'registered', '127.0.0.1']);
+for (let i = 0; i < 4; i++) run("INSERT INTO referral_visits (code, ip, ua, created_at) VALUES (?,?,?,datetime('now', ?))", [self1.account.referral_code, '127.0.0.1', 'seed', `-${i + 1} days`]);
+run('INSERT INTO notifications (tenant_id, user_id, type, title, content, payload) VALUES (?,?,?,?,?,?)', [self1.tenant.id, null, 'referral', '推广奖励已到账', '你邀请的用户完成付费，奖励已可提现。', JSON.stringify({ demo: true })]);
+
 const t0Ticket = run("INSERT INTO support_tickets (tenant_id, user_id, subject, category, priority, status, last_message_at) VALUES (?,?,?,?,?,?,datetime('now','-3 days'))", [t1, admin, '如何把访客数据导出成 CSV', 'feature', 'normal', 'resolved']).lastInsertRowid;
 run("INSERT INTO ticket_messages (ticket_id, sender_type, sender_id, sender_name, content, created_at) VALUES (?,?,?,?,?,datetime('now','-3 days'))", [t0Ticket, 'tenant', admin, '林晓', '线索列表可以批量导出吗？']);
 run("INSERT INTO ticket_messages (ticket_id, sender_type, sender_id, sender_name, content, created_at) VALUES (?,?,?,?,?,datetime('now','-2 days'))", [t0Ticket, 'platform', platformAdmin, '平台运营', '专业版支持在线索 CRM 右上角导出 CSV，已为你标记解决。']);

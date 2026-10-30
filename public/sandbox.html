@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>__WORKSPACE_NAME__ · 专属体验站</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="/assets/apollo-ui.css">
+  <link rel="stylesheet" href="/demo/demo.css">
+  <style>
+    .sandbox-banner { position: sticky; top: 0; z-index: 60; background: linear-gradient(90deg,#0b1220,#1e3a8a); color: #dbeafe; padding: 10px 16px; display: flex; justify-content: center; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 12px; }
+    .sandbox-banner b { color: #fff; }
+    .sandbox-banner a { color: #7dd3fc; text-decoration: underline; text-underline-offset: 3px; }
+    .sandbox-step { max-width: 720px; margin: 28px auto 0; background: rgba(255,255,255,.82); border: 1px solid rgba(148,163,184,.25); border-radius: 16px; padding: 18px 22px; font-size: 12.5px; line-height: 1.8; color: #475569; box-shadow: 0 14px 36px rgba(15,23,42,.06); }
+    .sandbox-step b { color: #0b1220; }
+    .sandbox-step ol { margin: 8px 0 0; padding-left: 20px; }
+    .sandbox-tag { display: inline-block; font-size: 10px; font-weight: 700; color: #1d4ed8; background: rgba(37,99,235,.08); padding: 3px 9px; border-radius: 999px; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div class="sandbox-banner">
+    <span><b>专属体验站</b> · __WORKSPACE_NAME__</span>
+    <span>这里的咨询会实时进入你的后台会话中心</span>
+    <a href="/admin/#/onboarding" target="_blank" rel="noopener">返回接入向导</a>
+  </div>
+  <header class="demo-nav">
+    <div class="demo-wrap nav-row">
+      <a class="demo-brand" href="#">
+        <span class="demo-mark">体</span>
+        <span><b>__SITE_NAME__</b><small>YOUR SANDBOX SITE</small></span>
+      </a>
+      <nav><a href="#product">产品</a><a href="#pricing">价格</a><a href="#about">关于</a></nav>
+      <div class="nav-right"><a class="nav-cta" href="#chat">开始咨询</a></div>
+    </div>
+  </header>
+  <section class="demo-hero">
+    <div class="demo-wrap hero-row">
+      <div class="hero-left">
+        <span class="hero-badge">这是一份属于你的体验站</span>
+        <h1>你的网站，<br>也可以这样接住流量</h1>
+        <p>本页面使用你自己的 Site Key。点击右下角挂件发一条消息，回到管理后台就能在「会话接待」里看到它。体验完再把同一段 JS 粘贴到你的真实网站。</p>
+        <div class="hero-buttons"><a class="h-btn primary" href="#chat">打开客服挂件</a><a class="h-btn ghost" href="/admin/#/onboarding">回到接入向导</a></div>
+        <div class="hero-trust"><span>一段 JS</span><span>·</span><span>实时会话</span><span>·</span><span>行为轨迹</span></div>
+      </div>
+      <div class="hero-right">
+        <div class="dash-card">
+          <div class="dash-head"><b>体验站数据</b><span>实时进入后台</span></div>
+          <div class="dash-kpis"><div><span>页面浏览</span><b>1</b><em>已上报</em></div><div><span>会话</span><b>1</b><em>发消息后</em></div></div>
+          <svg viewBox="0 0 380 120" preserveAspectRatio="none" class="dash-chart">
+            <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2563eb" stop-opacity=".24"/><stop offset="100%" stop-color="#2563eb" stop-opacity="0"/></linearGradient></defs>
+            <path d="M0 100 L54 88 L108 92 L162 64 L216 72 L270 44 L324 52 L380 26 L380 120 L0 120 Z" fill="url(#sg)"/>
+            <path d="M0 100 L54 88 L108 92 L162 64 L216 72 L270 44 L324 52 L380 26" fill="none" stroke="#2563eb" stroke-width="2.4"/>
+          </svg>
+          <div class="dash-rows"><div><span>访客轨迹</span><i style="width:76%"></i><b>已开启</b></div><div><span>主动触发</span><i style="width:58%"></i><b>可配置</b></div><div><span>线索表单</span><i style="width:40%"></i><b>可配置</b></div></div>
+        </div>
+        <div class="hero-float"><b>接入方式</b><span>1 段 JS</span><em>无需改代码</em></div>
+      </div>
+    </div>
+  </section>
+  <section class="demo-section" id="product">
+    <div class="demo-wrap">
+      <div class="sandbox-step">
+        <span class="sandbox-tag">体验清单</span>
+        <b>建议按这三步体验</b>
+        <ol>
+          <li>点击右下角客服按钮，发一条「我想了解专业版」。</li>
+          <li>回到后台「会话接待」，查看这条消息和访客轨迹。</li>
+          <li>在「接入向导」复制代码，粘贴到你的真实网站，安装检测会自动完成。</li>
+        </ol>
+      </div>
+      <div class="section-head" style="margin-top:34px"><span class="s-kicker">页面内容</span><h2>这里可以是你的官网</h2><p>体验站使用模拟内容，挂件、埋点、会话和线索都走真实链路。</p></div>
+      <div class="product-grid">
+        <article><span class="p-ico blue">01</span><h3>实时客服</h3><p>访客发消息，后台实时收到，支持客服接管、转接和内部备注。</p></article>
+        <article><span class="p-ico purple">02</span><h3>访客轨迹</h3><p>来源、页面、停留与点击自动记录，不需要额外埋点。</p></article>
+        <article><span class="p-ico green">03</span><h3>主动触达</h3><p>停留、滚动、退出意图都能触发问候、表单或 FAQ。</p></article>
+        <article><span class="p-ico orange">04</span><h3>线索闭环</h3><p>聊天与表单统一进入线索池，状态、负责人、跟进记录可追踪。</p></article>
+      </div>
+    </div>
+  </section>
+  <section class="demo-section alt" id="pricing">
+    <div class="demo-wrap">
+      <div class="section-head center"><span class="s-kicker">体验提示</span><h2>这是你的专属页面</h2><p>关闭后随时可以从「接入向导」重新打开。体验数据会保留在你的后台，方便你验证完整链路。</p></div>
+    </div>
+  </section>
+  <footer class="demo-footer" id="about">
+    <div class="demo-wrap foot-row"><div><b>__BRAND_NAME__</b><p>专属体验站 · 由轻客服 SaaS提供能力</p></div><div class="foot-links"><a href="/admin/#/onboarding">接入向导</a><a href="/">了解产品</a><a href="/admin/">管理后台</a></div></div>
+    <div class="demo-wrap foot-copy">本页面仅用于你的接入体验，不对外索引</div>
+  </footer>
+  <script>
+    document.querySelectorAll('a[href="#chat"]').forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (window.Qingzhan) window.Qingzhan.open();
+      });
+    });
+  </script>
+  <script async src="/widget.js?key=__SITE_KEY__"></script>
+</body>
+</html>

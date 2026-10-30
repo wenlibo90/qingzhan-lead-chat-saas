@@ -104,6 +104,7 @@ function sitePublic(site, plan, base) {
     name: site.name,
     domain: site.domain,
     site_key: site.site_key,
+    loader_token: site.loader_token || null,
     is_sandbox: !!site.is_sandbox,
     installed_at: site.installed_at || null,
     last_widget_ping_at: site.last_widget_ping_at || null,

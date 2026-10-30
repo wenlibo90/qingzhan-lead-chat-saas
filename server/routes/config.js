@@ -1,7 +1,7 @@
 'use strict';
 const express = require('express');
 const crypto = require('node:crypto');
-const { all, get, run, json } = require('../db');
+const { all, get, run, json, tx } = require('../db');
 const { authRequired, requireRole, featureGate } = require('../auth');
 const { siteScope, audit, sitePublic, publicBase } = require('../helpers');
 const { hasFeature, limitOf, featureLabel, FEATURES } = require('../plans');
@@ -57,6 +57,7 @@ function sanitizeConfig(input, plan) {
     aiEnabled: hasFeature(plan, 'ai_bot') ? !!c.aiEnabled : false,
     aiName: String(c.aiName || 'AI 助手').slice(0, 20),
     theme: ['light', 'dark', 'auto'].includes(c.theme) ? c.theme : 'light',
+    locale: ['zh-CN', 'zh-TW', 'en', 'ja', 'ko'].includes(c.locale) ? c.locale : 'zh-CN',
     quickReplies: Array.isArray(c.quickReplies) ? c.quickReplies.slice(0, 6).map((x) => String(x).slice(0, 30)) : ['想了解价格', '怎么接入', '预约演示'],
     compliance: {
       enabled: false,
@@ -93,10 +94,12 @@ router.post('/sites', requireRole('admin', 'operator'), (req, res) => {
   const limited = countLimitCheck(req, res, 'sites');
   if (limited) return limited;
   const name = String(req.body.name || '').trim().slice(0, 50);
+  const domain = String(req.body.domain || '').trim().slice(0, 120);
   if (!name) return res.status(400).json({ error: '请填写站点名称' });
+  if (!domain) return res.status(400).json({ error: '请填写绑定域名' });
   const key = `qz_${crypto.randomBytes(7).toString('hex')}`;
   const id = run('INSERT INTO sites (tenant_id, name, domain, site_key, loader_token, widget_config) VALUES (?,?,?,?,?,?)',
-    [req.tenant.id, name, String(req.body.domain || '').slice(0, 120), key, loaderToken(), JSON.stringify(sanitizeConfig({}, req.tenant.plan))]).lastInsertRowid;
+    [req.tenant.id, name, domain, key, loaderToken(), JSON.stringify(sanitizeConfig({}, req.tenant.plan))]).lastInsertRowid;
   audit(req, 'site.create', `site:${id}`, name);
   const site = get('SELECT * FROM sites WHERE id = ?', [id]);
   res.json({ ok: true, site: sitePublic(site, req.tenant.plan, baseUrl(req)) });
@@ -117,6 +120,28 @@ router.patch('/sites/:id', requireRole('admin', 'operator'), (req, res) => {
   audit(req, 'site.update', `site:${site.id}`, Object.keys(body).join(','));
   const fresh = get('SELECT * FROM sites WHERE id = ?', [site.id]);
   res.json({ ok: true, site: sitePublic(fresh, req.tenant.plan, baseUrl(req)) });
+});
+
+router.delete('/sites/:id', requireRole('admin'), (req, res) => {
+  const site = get('SELECT * FROM sites WHERE id = ? AND tenant_id = ?', [Number(req.params.id), req.tenant.id]);
+  if (!site) return res.status(404).json({ error: '站点不存在' });
+  tx(() => {
+    run('DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE site_id = ? AND tenant_id = ?)', [site.id, req.tenant.id]);
+    run('DELETE FROM follow_ups WHERE lead_id IN (SELECT id FROM leads WHERE site_id = ? AND tenant_id = ?)', [site.id, req.tenant.id]);
+    run('DELETE FROM visitor_tags WHERE visitor_id IN (SELECT id FROM visitors WHERE site_id = ? AND tenant_id = ?)', [site.id, req.tenant.id]);
+    run('DELETE FROM rule_logs WHERE visitor_id IN (SELECT id FROM visitors WHERE site_id = ? AND tenant_id = ?)', [site.id, req.tenant.id]);
+    run('DELETE FROM form_submissions WHERE site_id = ? AND tenant_id = ?', [site.id, req.tenant.id]);
+    run('DELETE FROM recordings WHERE site_id = ? AND tenant_id = ?', [site.id, req.tenant.id]);
+    run('DELETE FROM leads WHERE site_id = ? AND tenant_id = ?', [site.id, req.tenant.id]);
+    run('DELETE FROM conversations WHERE site_id = ? AND tenant_id = ?', [site.id, req.tenant.id]);
+    run('DELETE FROM visitors WHERE site_id = ? AND tenant_id = ?', [site.id, req.tenant.id]);
+    for (const table of ['visitor_sessions', 'pageviews', 'events', 'forms', 'faq_categories', 'faqs', 'knowledge_files', 'rules', 'blacklist', 'announcements']) {
+      run(`DELETE FROM ${table} WHERE site_id = ? AND tenant_id = ?`, [site.id, req.tenant.id]);
+    }
+    run('DELETE FROM sites WHERE id = ? AND tenant_id = ?', [site.id, req.tenant.id]);
+  });
+  audit(req, 'site.delete', `site:${site.id}`, `${site.name} / ${site.domain || ''}`);
+  res.json({ ok: true });
 });
 
 router.post('/sites/:id/rotate-key', requireRole('admin'), (req, res) => {

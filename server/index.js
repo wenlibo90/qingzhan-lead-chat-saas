@@ -20,6 +20,8 @@ const onboardingRoutes = require('./routes/onboarding');
 const opsRoutes = require('./routes/ops');
 const paymentRoutes = require('./routes/payments');
 const supportRoutes = require('./routes/support');
+const referralRoutes = require('./routes/referral');
+const referralService = require('./services/referral');
 const { startLifecycle } = require('./services/lifecycle');
 const socketInit = require('./socket').init;
 const { UPLOAD_DIR } = require('./upload');
@@ -101,6 +103,7 @@ app.use('/api/public', landingRoutes);
 app.use('/api/signup', signupRoutes);
 app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/support', supportRoutes);
+app.use('/api/referral', referralRoutes);
 app.use('/api/ops', opsRoutes);
 app.use('/api/public/payments', paymentRoutes);
 app.use('/api/auth', authRoutes);
@@ -117,6 +120,12 @@ app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d', fallthrough: true
 app.use(express.static(PUBLIC_DIR, { index: false, maxAge: 0, etag: true }));
 
 app.get(['/demo', '/demo/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'demo', 'index.html')));
+app.get('/r/:code', (req, res) => {
+  const code = String(req.params.code || '').trim();
+  referralService.recordVisit(code, (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0], req.headers['user-agent']);
+  res.redirect(302, '/signup/?ref=' + encodeURIComponent(code));
+});
+app.get(['/promote', '/promote/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'promote.html')));
 app.get(['/signup', '/signup/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'signup', 'index.html')));
 app.get(['/admin', '/admin/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin', 'index.html')));
 app.get(['/ops', '/ops/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'ops', 'index.html')));

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>推广计划 · 轻客服 SaaS</title>
+  <meta name="description" content="推荐轻客服 SaaS 给朋友或客户，首单付费获得 20% 推广奖励。">
+  <link rel="stylesheet" href="/assets/apollo-ui.css">
+  <link rel="stylesheet" href="/assets/landing.css">
+  <style>
+    .promo-wrap { width: min(1080px, calc(100% - 40px)); margin: 0 auto; padding: 80px 0 70px; }
+    .promo-hero { padding: 48px; border-radius: 28px; color: #fff; background: radial-gradient(circle at 85% 10%, rgba(251,191,36,.35), transparent 30%), linear-gradient(135deg,#1e1b4b,#4338ca 55%,#0e7490); box-shadow: 0 30px 80px rgba(49,46,129,.25); }
+    .promo-hero h1 { font-size: clamp(34px,5vw,54px); letter-spacing: -.045em; margin: 12px 0 14px; line-height: 1.1; }
+    .promo-hero p { max-width: 680px; color: #e0e7ff; line-height: 1.9; font-size: 14px; }
+    .promo-actions { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
+    .promo-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-top: 22px; }
+    .promo-card { background: rgba(255,255,255,.8); border: 1px solid var(--line); border-radius: 18px; padding: 22px; }
+    .promo-card b { display: block; font-size: 26px; color: #1d4ed8; letter-spacing: -.04em; }
+    .promo-card h3 { margin: 8px 0 6px; font-size: 15px; }
+    .promo-card p { margin: 0; font-size: 12px; line-height: 1.8; color: var(--muted); }
+    .promo-rules { margin-top: 22px; background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 24px; }
+    .promo-rules h2 { margin: 0 0 12px; font-size: 20px; }
+    .promo-rules li { font-size: 12.5px; line-height: 2; color: #475569; }
+    @media(max-width:760px){ .promo-grid{grid-template-columns:1fr;} .promo-hero{padding:28px;} }
+  </style>
+</head>
+<body class="landing-body">
+  <header class="site-nav">
+    <div class="nav-inner">
+      <a class="brand" href="/"><span class="brand-mark"><img src="/assets/logo.webp" alt="轻客服 SaaS"></span><span class="brand-text"><b>轻客服 SaaS</b><small>客服挂件 · 线索 CRM</small></span></a>
+      <div class="nav-actions"><a class="btn btn-ghost btn-sm" href="/">返回官网</a><a class="btn btn-primary btn-sm" href="/signup">免费注册</a></div>
+    </div>
+  </header>
+  <main class="promo-wrap">
+    <section class="promo-hero">
+      <span class="kicker light">REFERRAL PROGRAM</span>
+      <h1>推荐一位客户<br>获得首单 20% 奖励</h1>
+      <p>把轻客服 SaaS 推荐给正在找客服、访客分析和线索工具的站长、朋友或客户。对方通过你的专属链接注册并完成首次付费，你就能获得实付金额 20% 的推广奖励。</p>
+      <div class="promo-actions"><a class="btn btn-primary btn-lg" href="/signup">注册后获取专属链接</a><a class="btn btn-ghost btn-lg" href="/admin/#/referral" style="background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.24)">登录推广中心</a></div>
+    </section>
+    <section class="promo-grid">
+      <article class="promo-card"><b>20%</b><h3>首单佣金</h3><p>被邀请人首次购买标准版或专业版，按实付金额的 20% 计算奖励。</p></article>
+      <article class="promo-card"><b>7 天</b><h3>结算周期</h3><p>支付完成 7 天后奖励转为可提现，退款订单会自动作废。</p></article>
+      <article class="promo-card"><b>¥100</b><h3>起提金额</h3><p>可提现余额达到 100 元即可提交申请，由平台运营审核打款。</p></article>
+    </section>
+    <section class="promo-rules">
+      <h2>推广规则</h2>
+      <ul>
+        <li>只有通过你的专属链接注册的新账号才会计入推荐关系。</li>
+        <li>奖励按被邀请人首次付费订单计算，续费和升级不重复计算。</li>
+        <li>禁止自邀请、批量注册、刷单或虚假交易，违规奖励会被作废。</li>
+        <li>提现需要提供收款说明，平台运营人工审核后打款。</li>
+        <li>推广中心可以实时查看访问、注册、激活、付费和奖励明细。</li>
+      </ul>
+      <div class="flex gap-1 mt-2 wrap"><a class="btn btn-primary" href="/signup">免费注册</a><a class="btn btn-ghost" href="/admin/#/referral">进入推广中心</a></div>
+    </section>
+  </main>
+  <script async src="/qz.js?0f928e95b1adc3f89d3a1e0dab18c5bf"></script>
+</body>
+</html>

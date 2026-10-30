@@ -68,7 +68,7 @@ function once(socket, event) {
   ok('加载器禁止直接打开', loaderDirect.status === 404);
   const loaderScript = await fetch(BASE + '/qz.js?' + demoToken, { headers: { 'sec-fetch-dest': 'script' } });
   const loaderText = await loaderScript.text();
-  ok('加载器按令牌注入且仅保留版权头', loaderScript.status === 200 && loaderText.startsWith('/*! Qingzhan Lead Chat Widget loader v1.0 */') && !/\n\s*\/\//.test(loaderText) && !loaderText.includes('/widget.js'), loaderText.slice(0, 120));
+  ok('加载器按令牌注入且仅保留版权头', loaderScript.status === 200 && loaderText.startsWith('/*! Qingke SaaS Widget loader v1.0 */') && !/\n\s*\/\//.test(loaderText) && !loaderText.includes('/widget.js'), loaderText.slice(0, 120));
   const coreDirect = await fetch(BASE + '/qz-core.js');
   ok('内核脚本禁止直接打开', coreDirect.status === 404);
   const corsRes = await fetch(BASE + '/api/public/config?key=' + KEY, { headers: { Origin: 'https://customer.example' } });
@@ -260,21 +260,36 @@ function once(socket, event) {
 
   console.log('\n[12] 自助注册与平台运营');
   const signupPhone = '139' + String(Date.now()).slice(-8);
+  const referrer = get("SELECT id, referral_code FROM accounts WHERE phone = '13600000001'");
   const sendCode = await req('/api/signup/send-code', { body: { phone: signupPhone } });
   ok('注册验证码发送', sendCode.status === 200 && sendCode.data.dev_code, sendCode.data);
   const reg = await req('/api/signup/register', { body: {
-    phone: signupPhone, code: sendCode.data.dev_code, password: 'test1234', name: '测试站长',
-    workspaceName: '测试独立站', website: 'www.test-indie.com', industry: '个人博客', goal: '线索收集'
+    phone: signupPhone, code: sendCode.data.dev_code, password: 'test1234', name: '测试站长', locale: 'en',
+    workspaceName: '测试独立站', website: 'www.test-indie.com', industry: '个人博客', goal: '线索收集', ref: referrer.referral_code
   } });
   ok('自助注册创建账号与工作空间', reg.status === 200 && reg.data.token && reg.data.tenant.plan === 'pro', reg.data);
   const newToken = reg.data.token;
+  const refRedirect = await fetch(BASE + '/r/' + referrer.referral_code, { redirect: 'manual' });
+  ok('推广短链可访问并跳转注册', refRedirect.status === 302 && (refRedirect.headers.get('location') || '').includes('/signup/?ref=' + referrer.referral_code));
+  const refLogin = await req('/api/auth/login', { body: { phone: '13600000001', password: 'demo1234' } });
+  const refOverview = await req('/api/referral', { token: refLogin.data.token });
+  ok('推广中心返回邀请链接与统计', refOverview.status === 200 && refOverview.data.link.includes('/r/') && refOverview.data.stats.registered >= 2, refOverview.data.stats);
   const newMe = await req('/api/auth/me', { token: newToken });
   ok('注册只创建账号与工作空间', newMe.status === 200 && newMe.data.sites.length === 0 && newMe.data.trial.status === 'trialing', newMe.data.sites);
   const onb0 = await req('/api/onboarding/status', { token: newToken });
   ok('接入向导提示先添加网站', onb0.status === 200 && onb0.data.steps.length === 5 && onb0.data.steps[0].key === 'site' && !onb0.data.steps[0].done, onb0.data);
+  const noDomainSite = await req('/api/sites', { token: newToken, body: { name: '缺少域名' } });
+  ok('添加站点要求绑定域名', noDomainSite.status === 400 && /域名/.test(noDomainSite.data.error), noDomainSite.data);
   const newSite = await req('/api/sites', { token: newToken, body: { name: '测试独立站', domain: 'www.test-indie.com' } });
-  ok('后台添加自己的网站', newSite.status === 200 && newSite.data.site.site_key, newSite.data.site);
+  ok('后台添加自己的网站', newSite.status === 200 && newSite.data.site.site_key && newSite.data.site.loader_token, newSite.data.site);
+  const tempSite = await req('/api/sites', { token: newToken, body: { name: '待删除站点', domain: 'delete.example.com' } });
+  const delSite = await req('/api/sites/' + tempSite.data.site.id, { token: newToken, method: 'DELETE' });
+  const sitesAfterDelete = await req('/api/sites', { token: newToken });
+  ok('站点可删除且从列表移除', delSite.status === 200 && !sitesAfterDelete.data.sites.some((x) => x.id === tempSite.data.site.id), sitesAfterDelete.data.sites);
   const prodKey = newSite.data.site.site_key;
+  await req('/api/sites/' + newSite.data.site.id, { token: newToken, method: 'PATCH', body: { widget_config: Object.assign({}, newSite.data.site.widget_config, { locale: 'en' }) } });
+  const enCfg = await req('/api/public/config?key=' + prodKey);
+  ok('挂件配置支持五语言', enCfg.status === 200 && enCfg.data.widget.locale === 'en', enCfg.data.widget.locale);
   await req('/api/public/config?key=' + prodKey);
   const onb1 = await req('/api/onboarding/status', { token: newToken });
   ok('挂件请求后自动检测安装', onb1.data.production_site.installed_at, onb1.data.production_site);
@@ -313,6 +328,8 @@ function once(socket, event) {
   const order = await req('/api/billing/orders', { token: newToken, body: { plan: 'standard', cycle: 'monthly' } });
   ok('创建订阅订单并服务端计价', order.status === 200 && order.data.order.amount_cents === 29900 && order.data.order.status === 'pending', order.data);
   const paid = await req('/api/billing/orders/' + order.data.order.id + '/pay', { token: newToken, body: {} });
+  const refReward = get('SELECT * FROM referral_rewards WHERE order_id = ?', [order.data.order.id]);
+  ok('被邀请人首单支付生成推广奖励', !!refReward && refReward.amount_cents === 5980 && refReward.referrer_account_id === referrer.id, refReward);
   ok('模拟支付开通标准版', paid.status === 200 && paid.data.subscription.plan === 'standard' && paid.data.subscription.plan_status === 'active', paid.data);
   const bill = await req('/api/billing', { token: newToken });
   ok('订单与发票可查询', bill.status === 200 && bill.data.orders.some((o) => o.status === 'paid') && bill.data.invoices.length >= 1, bill.data.invoices);
@@ -339,6 +356,16 @@ function once(socket, event) {
   ok('运营回复工单', opsReply.status === 200);
   const ticketAfter = await req('/api/support/tickets/' + ticket.data.id, { token: newToken });
   ok('客户收到运营回复', ticketAfter.data.messages.length >= 2 && ticketAfter.data.ticket.status === 'pending', ticketAfter.data.ticket);
+  const profileRes = await req('/api/auth/profile', { token: newToken, method: 'PATCH', body: { name: '独立站站长', avatar: 'av3' } });
+  const profileMe = await req('/api/auth/me', { token: newToken });
+  ok('用户可修改昵称与内置头像', profileRes.status === 200 && profileMe.data.user.name === '独立站站长' && profileMe.data.user.avatar === 'av3', profileMe.data.user);
+  const badAvatar = await req('/api/auth/profile', { token: newToken, method: 'PATCH', body: { name: '独立站站长', avatar: 'bad' } });
+  ok('非法头像被拒绝', badAvatar.status === 400);
+
+  const opsRefs = await req('/api/ops/referrals', { token: opsToken });
+  const pendingWithdrawal = opsRefs.data.withdrawals.filter((w) => ['requested', 'approved'].includes(w.status))[0];
+  const approveWithdrawal = pendingWithdrawal ? await req('/api/ops/referral-withdrawals/' + pendingWithdrawal.id, { token: opsToken, method: 'PATCH', body: { status: 'approved' } }) : { status: 0 };
+  ok('运营可审核推广提现', opsRefs.status === 200 && pendingWithdrawal && approveWithdrawal.status === 200, opsRefs.data.totals);
 
   runLifecycle();
   const pqlCount = get("SELECT COUNT(*) c FROM applications WHERE source = 'pql'");

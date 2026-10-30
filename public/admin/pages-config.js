@@ -80,6 +80,7 @@
       '<div><label class="field-label">移动端距底部</label><input class="az-input" type="number" data-m="offsetBottom" value="' + ((cfg.mobile && cfg.mobile.offsetBottom) || 18) + '"></div>' +
       '</div></div></div>' +
       '<div class="az-card"><div class="az-card-head"><h3>文案</h3><div class="sub">访客第一眼看到的表达</div></div><div class="az-card-body"><div class="form-grid">' +
+      '<div><label class="field-label">界面语言</label><select class="az-select" data-f="locale"><option value="zh-CN"' + (cfg.locale !== 'zh-TW' && cfg.locale !== 'en' && cfg.locale !== 'ja' && cfg.locale !== 'ko' ? ' selected' : '') + '>简体中文</option><option value="zh-TW"' + (cfg.locale === 'zh-TW' ? ' selected' : '') + '>繁體中文</option><option value="en"' + (cfg.locale === 'en' ? ' selected' : '') + '>English</option><option value="ja"' + (cfg.locale === 'ja' ? ' selected' : '') + '>日本語</option><option value="ko"' + (cfg.locale === 'ko' ? ' selected' : '') + '>한국어</option></select></div>' +
       '<div><label class="field-label">窗口标题</label><input class="az-input" data-f="title" value="' + A.esc(cfg.title || '在线客服') + '"></div>' +
       '<div><label class="field-label">客服名称</label><input class="az-input" data-f="agentName" value="' + A.esc(cfg.agentName || '客服') + '"></div>' +
       '<div class="full"><label class="field-label">欢迎语</label><textarea class="az-textarea" data-f="welcome">' + A.esc(cfg.welcome || '') + '</textarea></div>' +
@@ -220,20 +221,21 @@
         embedStep('微信小程序 / H5', 'H5 可直接使用；小程序请使用企业版开放 API 或 web-view。') +
         '</div></div></div>' +
         '<div class="az-card"><div class="az-card-head"><h3>接入验证</h3></div><div class="az-card-body"><div class="tiny muted" style="line-height:1.9">1. 打开网站，右下角应出现客服按钮<br>2. 点击按钮，确认欢迎语与客服在线状态<br>3. 发送一条消息，后台「会话接待」应实时收到<br>4. 在「数据概览」查看页面浏览与来源是否入库<br>5. 用广告拦截插件测试「挂件拦截」上报</div>' +
-        '<a class="au-btn au-btn--ghost au-btn--sm mt-2" href="/demo/" target="_blank">' + A.icon('external', 13) + ' 打开演示站验证</a></div></div></div>' +
+        '</div></div></div>' +
         '<div class="grid" style="gap:16px;align-content:start"><div class="az-card pad"><h4 style="margin:0 0 8px;font-size:13px">站点信息</h4>' +
         '<div class="side-kv"><span>站点名称</span><b>' + A.esc(site.name) + '</b></div><div class="side-kv"><span>绑定域名</span><b>' + A.esc(site.domain || '-') + '</b></div>' +
-        '<div class="side-kv"><span>Site Key</span><b class="mono" style="font-size:10px">' + A.esc(site.site_key) + '</b></div>' +
+        '<div class="side-kv"><span>加载令牌</span><b class="mono" style="font-size:10px">' + A.esc(site.loader_token || '-') + '</b></div>' +
         '<div class="side-kv"><span>行为采集</span><b>' + (site.tracking_enabled ? '已开启' : '已关闭') + '</b></div>' +
-        '<button class="au-btn au-btn--ghost au-btn--sm" style="width:100%;margin-top:10px" data-rotate>重新生成 Site Key</button></div>' +
+        '<button class="au-btn au-btn--ghost au-btn--sm" style="width:100%;margin-top:10px" data-rotate>重新生成加载令牌</button></div>' +
         '<div class="az-card pad"><h4 style="margin:0 0 8px;font-size:13px">拦截说明</h4><div class="tiny muted" style="line-height:1.8">若挂件被广告拦截插件误拦，后台会记录拦截事件。建议：使用独立域名托管脚本、避免脚本文件名包含 ads/track 关键词、为拦截访客提供邮件或表单降级入口。</div></div></div></div>';
       box.querySelector('[data-copy]').onclick = function () { A.copy(d.embed_code); };
       box.querySelector('[data-rotate]').onclick = function () {
-        A.confirm({ title: '重新生成 Site Key', message: '旧代码将立即失效，需要把新代码重新粘贴到网站。', danger: true, okText: '重新生成' }).then(function (ok) {
+        A.confirm({ title: '重新生成加载令牌', message: '旧代码将立即失效，需要把新代码重新粘贴到网站。', danger: true, okText: '重新生成' }).then(function (ok) {
           if (!ok) return;
           A.apiPost('/api/sites/' + site.id + '/rotate-key').then(function (res) {
-            A.toast('Site Key 已更新', 'ok');
+            A.toast('加载令牌已更新', 'ok');
             site.site_key = res.site_key;
+            site.loader_token = res.loader_token;
             site.embed_code = res.embed_code;
             A.route();
           }).catch(A.handleError);
@@ -324,11 +326,11 @@
         if (!d.sites.length) { grid.innerHTML = '<div class="az-card pad">' + A.empty('还没有站点', '添加站点后会生成一段独立 JS 代码') + '</div>'; return; }
         grid.innerHTML = d.sites.map(function (s) {
           return '<div class="az-card"><div class="az-card-head"><div class="flex items-center gap-1"><span class="avatar-sm">' + A.icon('globe', 14) + '</span><div><h3>' + A.esc(s.name) + '</h3><div class="sub">' + A.esc(s.domain || '未绑定域名') + '</div></div></div>' +
-            '<span class="pill ' + (String(s.id) === String(A.state.siteId) ? 'blue' : 'gray') + '">' + (String(s.id) === String(A.state.siteId) ? '当前站点' : '切换') + '</span></div>' +
+            (String(s.id) === String(A.state.siteId) ? '<span class="pill blue">当前站点</span>' : '<button class="pill gray site-switch" data-use="' + s.id + '">切换</button>') + '</div>' +
             '<div class="az-card-body"><div class="grid g4" style="gap:8px"><div><div class="tiny muted">访客</div><b>' + s.stats.visitors + '</b></div><div><div class="tiny muted">会话</div><b>' + s.stats.conversations + '</b></div><div><div class="tiny muted">线索</div><b>' + s.stats.leads + '</b></div><div><div class="tiny muted">拦截</div><b>' + s.stats.blockedEvents + '</b></div></div>' +
             '<div class="code-box mt-2" style="font-size:10px;padding:10px 12px">' + A.esc(s.embed_code) + '</div>' +
-            '<div class="flex gap-1 mt-2 wrap"><button class="au-btn au-btn--primary au-btn--xs" data-copy="' + s.id + '">复制代码</button><button class="au-btn au-btn--ghost au-btn--xs" data-use="' + s.id + '">设为当前</button>' + '<button class="au-btn au-btn--ghost au-btn--xs" data-edit-site="' + s.id + '">编辑</button><button class="au-btn au-btn--ghost au-btn--xs" data-widget="' + s.id + '">挂件配置</button></div>' +
-            '<div class="tiny muted mt-1">Site Key：<span class="mono">' + A.esc(s.site_key) + '</span></div></div></div>';
+            '<div class="flex gap-1 mt-2 wrap"><button class="au-btn au-btn--primary au-btn--xs" data-copy="' + s.id + '">复制代码</button><button class="au-btn au-btn--ghost au-btn--xs" data-use="' + s.id + '">设为当前</button>' + '<button class="au-btn au-btn--ghost au-btn--xs" data-edit-site="' + s.id + '">编辑</button><button class="au-btn au-btn--ghost au-btn--xs" data-widget="' + s.id + '">挂件配置</button>' + (A.isAdmin() ? '<button class="au-btn au-btn--ghost au-btn--xs" data-del-site="' + s.id + '" style="color:#dc2626">删除</button>' : '') + '</div>' +
+            '<div class="tiny muted mt-1">加载令牌：<span class="mono">' + A.esc(s.loader_token || '-') + '</span></div></div></div>';
         }).join('');
         A.$$('[data-copy]', grid).forEach(function (b) {
           b.onclick = function () {
@@ -363,22 +365,38 @@
             });
           };
         });
+        A.$$('[data-del-site]', grid).forEach(function (b) {
+          b.onclick = function () {
+            var s = d.sites.filter(function (x) { return String(x.id) === b.getAttribute('data-del-site'); })[0];
+            if (!s) return;
+            A.confirm({ title: '删除站点', message: '删除「' + s.name + '」后，该站点的访客、会话、线索与报表数据将一并删除，且无法恢复。', danger: true, okText: '确认删除' }).then(function (ok) {
+              if (!ok) return;
+              A.api('/api/sites/' + s.id, { method: 'DELETE' }).then(function () {
+                if (String(A.state.siteId) === String(s.id)) {
+                  A.state.siteId = '';
+                  try { localStorage.removeItem('qz_admin_site'); } catch (e) { }
+                }
+                A.toast('站点已删除', 'ok');
+                A.boot();
+              }).catch(A.handleError);
+            });
+          };
+        });
       }).catch(A.handleError);
     }
   });
 
   function openCreateSite() {
     A.modal({
-      title: '添加站点', subtitle: '每个站点会获得独立 Site Key',
-      body: '<div class="grid"><div><label class="field-label">站点名称 *</label><input class="az-input" data-s="name" placeholder="例如 官网 / 帮助中心 / 活动页"></div><div><label class="field-label">绑定域名</label><input class="az-input" data-s="domain" placeholder="www.example.com"></div><div class="notice info">' + A.icon('globe', 14) + '<span>创建后把生成的 JS 粘贴到该站点，访客、会话、线索与报表按站点隔离。</span></div></div>',
+      title: '添加站点', subtitle: '每个站点会获得独立加载令牌',
+      body: '<div class="grid"><div><label class="field-label">站点名称 *</label><input class="az-input" data-s="name" placeholder="例如 官网 / 帮助中心 / 活动页"></div><div><label class="field-label">绑定域名 *</label><input class="az-input" data-s="domain" placeholder="www.example.com"></div></div>',
       footer: [{ label: '取消', class: 'au-btn--ghost' }, { label: '创建站点', class: 'au-btn--primary', onClick: function (card, close) {
         var body = {};
         A.$$('[data-s]', card).forEach(function (i) { body[i.getAttribute('data-s')] = i.value.trim(); });
         if (!body.name) return A.toast('请填写站点名称', 'err');
-        var wasEmpty = A.state.sites.length === 0;
+        if (!body.domain) return A.toast('请填写绑定域名', 'err');
         A.apiPost('/api/sites', body).then(function () {
           close(); A.toast('站点已创建', 'ok'); A.boot();
-          if (wasEmpty) setTimeout(function () { A.go('onboarding'); }, 500);
         }).catch(A.handleError);
       } }]
     });

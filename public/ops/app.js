@@ -82,7 +82,7 @@
   };
   O.confirm = function (opts) {
     return new Promise(function (resolve) {
-      O.modal({ title: opts.title || '确认', size: 'narrow', body: '<p style="font-size:12.5px;line-height:1.7;color:#475569;margin:0">' + O.esc(opts.message || '') + '</p>', footer: [{ label: '取消', class: 'au-btn--ghost', onClick: function (c, close) { close(); resolve(false); } }, { label: opts.okText || '确定', class: opts.danger ? 'au-btn--danger' : 'au-btn--primary', onClick: function (c, close) { close(); resolve(true); } }], onClose: function () { resolve(false); } });
+      O.modal({ title: opts.title || '确认', size: 'narrow', body: '<p style="font-size:12.5px;line-height:1.7;color:#475569;margin:0">' + O.esc(opts.message || '') + '</p>', footer: [{ label: '取消', class: 'au-btn--ghost', onClick: function (c, close) { resolve(false); close(); } }, { label: opts.okText || '确定', class: opts.danger ? 'au-btn--danger' : 'au-btn--primary', onClick: function (c, close) { resolve(true); close(); } }], onClose: function () { resolve(false); } });
     });
   };
   O.copy = function (text) { if (navigator.clipboard) navigator.clipboard.writeText(text).catch(function () { }); else { var t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); } O.toast('已复制', 'ok'); };
@@ -112,7 +112,7 @@
   O.nav = [
     { title: '平台概览', items: [{ key: 'overview', label: '运营概览', icon: 'overview' }] },
     { title: '客户与增长', items: [{ key: 'accounts', label: '客户账号', icon: 'users' }, { key: 'workspaces', label: '工作空间', icon: 'building' }, { key: 'applications', label: '申请线索', icon: 'inbox' }, { key: 'subscriptions', label: '订阅与试用', icon: 'card' }] },
-    { title: '治理', items: [{ key: 'risk', label: '风控审核', icon: 'shield' }, { key: 'tickets', label: '支持工单', icon: 'inbox' }, { key: 'team', label: '平台成员', icon: 'team' }, { key: 'logs', label: '操作日志', icon: 'logs' }] }
+    { title: '治理', items: [{ key: 'risk', label: '风控审核', icon: 'shield' }, { key: 'referrals', label: '推广奖励', icon: 'star' }, { key: 'tickets', label: '支持工单', icon: 'inbox' }, { key: 'team', label: '平台成员', icon: 'team' }, { key: 'logs', label: '操作日志', icon: 'logs' }] }
   ];
 
   O.renderLogin = function () {
@@ -120,17 +120,53 @@
     document.getElementById('ops-app').hidden = true;
     var box = document.getElementById('ops-login');
     box.hidden = false;
-    box.innerHTML = '<div class="ops-login-brand"><div class="brand"><span class="mark">运</span>轻站平台运营</div><div><h1>一条自助线，<br>一条销售线。</h1><p>在这里管理注册账号、工作空间、试用与申请线索。平台运营数据与客户后台隔离，客户看不到这里的任何信息。</p><ul><li>注册用户与工作空间分层管理</li><li>申请表单进入平台销售线索池</li><li>试用到期、风险账号与运营动作可追踪</li></ul></div></div>' +
-      '<div class="ops-login-form"><form class="ops-login-card" id="ops-login-form"><h2>运营登录</h2><p>平台运营账号独立于客户账号体系。</p><div class="au-form-group"><label class="au-label">运营邮箱</label><input class="au-input" name="email" type="email" value="ops@platform.com" required></div><div class="au-form-group"><label class="au-label">密码</label><input class="au-input" name="password" type="password" value="ops123" required></div><button class="au-btn au-btn--primary" style="width:100%" type="submit">进入运营控制台</button><div class="ops-demo"></div><div class="ops-demo"><b>演示账号</b><br>ops@platform.com / ops123 · 超级管理员<br>sales@platform.com / sales123 · 销售</div><div class="tiny muted mt-2" style="text-align:center">客户账号请前往 <a href="/admin/" style="color:#7c3aed">客户后台</a> 登录</div><div class="notice danger mt-2" id="ops-error" style="display:none"></div></form></div>';
-    box.querySelector('#ops-login-form').addEventListener('submit', function (e) {
+    box.innerHTML =
+      '<div class="login-brand">' +
+        '<div class="login-logo"><span class="login-logo-mark"><img src="/assets/logo.webp" alt=""></span>轻客服 SaaS<span class="ops-brand-pill">平台运营</span></div>' +
+        '<div class="login-hero">' +
+          '<h1>一条自助线，<br>一条销售线。</h1>' +
+          '<p>从注册账号、工作空间到试用订阅与销售申请，平台运营在一个控制台里完成。客户数据与运营数据完全隔离。</p>' +
+          '<div class="login-points">' +
+            '<div class="login-point"><span>' + O.icon('check', 13) + '</span>注册账号、工作空间、订阅订单统一视图</div>' +
+            '<div class="login-point"><span>' + O.icon('check', 13) + '</span>申请线索进入平台销售池，可转为工作空间</div>' +
+            '<div class="login-point"><span>' + O.icon('check', 13) + '</span>推广奖励、支持工单、风控与审计可追溯</div>' +
+          '</div>' +
+          '<div class="ops-login-note"><b>平台运营独立域</b><span>客户账号无法访问 /ops，运营账号也不会进入客户工作台。</span></div>' +
+          '<div class="login-foot">© 2026 轻客服 SaaS · 平台运营控制台</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="login-form-wrap"><form class="login-card" id="ops-login-form">' +
+        '<div class="flex items-center justify-between mb-2"><h2 style="margin:0">运营登录</h2><span class="ops-badge">平台运营</span></div>' +
+        '<p class="muted">平台运营账号独立于客户账号体系。</p>' +
+        '<div class="au-form-group"><label class="au-label">运营邮箱</label><input class="au-input" name="email" type="email" value="ops@platform.com" autocomplete="username" required></div>' +
+        '<div class="au-form-group"><label class="au-label">密码</label><input class="au-input" name="password" type="password" value="ops123" autocomplete="current-password" required></div>' +
+        '<div class="flex items-center justify-between mb-2"><label class="small muted flex items-center gap-1"><input type="checkbox" checked> 记住登录状态</label><span class="small muted">仅限平台成员</span></div>' +
+        '<button class="au-btn au-btn--primary au-btn--lg" style="width:100%" type="submit">进入运营控制台</button>' +
+        '<div id="ops-error" class="notice danger mt-2" style="display:none"></div>' +
+        '<div class="demo-accounts"><p>演示账号（点击自动登录）</p><div class="demo-row">' +
+          '<button type="button" class="demo-chip" data-email="ops@platform.com" data-pass="ops123">超级管理员 · ops@platform.com</button>' +
+          '<button type="button" class="demo-chip" data-email="sales@platform.com" data-pass="sales123">销售 · sales@platform.com</button>' +
+        '</div></div>' +
+        '<div class="tiny muted mt-2" style="text-align:center">客户账号请前往 <a href="/admin/" style="color:#2563eb">客户后台</a> 登录</div>' +
+      '</form></div>';
+    var form = document.getElementById('ops-login-form');
+    form.addEventListener('submit', function (e) {
       e.preventDefault();
-      var form = e.target;
       var btn = form.querySelector('button[type=submit]');
+      var errBox = document.getElementById('ops-error');
       btn.disabled = true; btn.textContent = '登录中...';
+      errBox.style.display = 'none';
       fetch('/api/ops/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: form.email.value.trim(), password: form.password.value }) })
         .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || '登录失败'); return d; }); })
         .then(function (d) { O.state.token = d.token; LS.set('qz_ops_token', d.token); O.boot(); })
-        .catch(function (err) { var box = document.getElementById('ops-error'); box.style.display = 'flex'; box.textContent = err.message; btn.disabled = false; btn.textContent = '进入运营控制台'; });
+        .catch(function (err) { errBox.style.display = 'flex'; errBox.textContent = err.message; btn.disabled = false; btn.textContent = '进入运营控制台'; });
+    });
+    O.$$('.demo-chip', form).forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        form.email.value = chip.getAttribute('data-email');
+        form.password.value = chip.getAttribute('data-pass');
+        form.dispatchEvent(new Event('submit'));
+      });
     });
   };
   O.logout = function (silent) { O.state.token = ''; O.state.user = null; LS.del('qz_ops_token'); if (silent) O.toast('登录已失效，请重新登录', 'err'); O.renderLogin(); };
@@ -149,7 +185,7 @@
   };
   O.renderShell = function () {
     var side = document.getElementById('ops-sidebar');
-    side.innerHTML = '<div class="side-logo"><span class="side-logo-mark">运</span><span><b>轻站平台运营</b><small class="ops-brand-sub">OPS CONSOLE</small></span></div>' +
+    side.innerHTML = '<div class="side-logo"><span class="side-logo-mark"><img src="/assets/logo.webp" alt=""></span><span><b>轻客服 SaaS</b><small class="ops-brand-sub">平台运营 · OPS CONSOLE</small></span></div>' +
       '<div class="side-site"><span class="site-ico">' + O.icon('shield', 14) + '</span><span class="site-meta"><b>' + O.esc(O.state.user.name) + '</b><span>' + O.roleLabel(O.state.user.role) + '</span></span></div>' +
       '<nav class="side-nav">' + O.nav.map(function (g) { return '<div class="nav-group"><div class="nav-group-title">' + g.title + '</div>' + g.items.map(function (it) { return '<button class="nav-item" data-nav="' + it.key + '"><span class="n-ico">' + O.icon(it.icon, 16) + '</span><span class="n-label">' + it.label + '</span></button>'; }).join('') + '</div>'; }).join('') + '</nav>' +
       '<div class="side-plan"><b><span>双线运营</span><span class="pill purple">OPS</span></b><p>自助注册与销售申请分开管理，数据统一沉淀。</p><button data-logout>退出运营后台</button></div>';

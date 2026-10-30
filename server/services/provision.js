@@ -21,6 +21,9 @@ function siteKey(prefix = 'qz') {
 function loaderToken() {
   return crypto.randomBytes(16).toString('hex');
 }
+function referralCode() {
+  return crypto.randomBytes(4).toString('hex').toUpperCase();
+}
 function randomPassword() {
   return crypto.randomBytes(9).toString('base64url');
 }
@@ -35,7 +38,7 @@ function assessRisk({ ip, email }) {
   return Math.min(100, score);
 }
 
-function ensureAccount({ name, email, phone, password, source = 'self_serve', ip = null }) {
+function ensureAccount({ name, email, phone, password, source = 'self_serve', ip = null, locale = 'zh-CN' }) {
   const normEmail = normalizeEmail(email);
   const normPhone = normalizePhone(phone);
   let account = normEmail ? get('SELECT * FROM accounts WHERE email = ?', [normEmail]) : null;
@@ -43,8 +46,8 @@ function ensureAccount({ name, email, phone, password, source = 'self_serve', ip
   if (account) return { account, created: false, tempPassword: null };
   const tempPassword = password || randomPassword();
   const id = run(
-    'INSERT INTO accounts (phone, email, name, password_hash, signup_source, signup_ip, risk_score) VALUES (?,?,?,?,?,?,?)',
-    [normPhone, normEmail, String(name || '用户').slice(0, 40), hashPassword(tempPassword), source, ip, assessRisk({ ip, email: normEmail })]
+    'INSERT INTO accounts (phone, email, name, password_hash, signup_source, signup_ip, risk_score, referral_code, locale) VALUES (?,?,?,?,?,?,?,?,?)',
+    [normPhone, normEmail, String(name || '用户').slice(0, 40), hashPassword(tempPassword), source, ip, assessRisk({ ip, email: normEmail }), referralCode(), locale]
   ).lastInsertRowid;
   account = get('SELECT * FROM accounts WHERE id = ?', [id]);
   return { account, created: true, tempPassword };
@@ -54,10 +57,10 @@ function createWorkspace(opts) {
   const {
     workspaceName, ownerName, email, phone, password, website,
     plan = 'pro', planStatus = 'trialing', source = 'self_serve', ip = null,
-    goal = '', industry = '', trialDays = 14, withSite = true
+    goal = '', industry = '', trialDays = 14, withSite = true, locale = 'zh-CN'
   } = opts || {};
   return tx(() => {
-    const { account, created, tempPassword } = ensureAccount({ name: ownerName, email, phone, password, source, ip });
+    const { account, created, tempPassword } = ensureAccount({ name: ownerName, email, phone, password, source, ip, locale });
     const trialEnds = planStatus === 'trialing' ? futureDate(trialDays) : null;
     const trialStarted = planStatus === 'trialing' ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null;
     const tenantId = run(
@@ -94,4 +97,4 @@ function createWorkspace(opts) {
   });
 }
 
-module.exports = { createWorkspace, ensureAccount, assessRisk, siteKey, loaderToken, normalizeEmail, normalizePhone, futureDate };
+module.exports = { createWorkspace, ensureAccount, assessRisk, siteKey, loaderToken, referralCode, normalizeEmail, normalizePhone, futureDate };
