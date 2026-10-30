@@ -772,7 +772,7 @@ a { color: var(--au-primary); }
   color: rgba(255,255,255,.9);
 }
 .login-copy .login-desc {
-  margin-top: clamp(10px, 1.5vh, 16px); max-width: min(100%, 700px);
+  margin-top: clamp(10px, 1.5vh, 16px); max-width: min(100%, 600px);
   font-size: clamp(12.5px, 1.02vw, 17px); line-height: 1.78; letter-spacing: .002em;
   color: rgba(255,255,255,.82); text-wrap: balance;
 }
