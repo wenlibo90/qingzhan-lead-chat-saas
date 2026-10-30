@@ -9,6 +9,7 @@
     if (s) CH.handlers.forEach(function (h) { s.off(h[0], h[1]); });
     CH.handlers = [];
     clearTimeout(CH.typingTimer);
+    if (CH.root) CH.root.classList.remove('page--chat');
     CH.root = null;
   }
 
@@ -27,7 +28,10 @@
     render: function (root, ctx) {
       cleanup();
       CH.root = root;
+      CH.activeId = null;
+      CH.detail = null;
       CH.mobileChat = false;
+      root.classList.add('page--chat');
       root.innerHTML = '<div class="page-head"><div><h1>会话接待</h1><p>访客消息通过 WebSocket 实时到达，未分配会话可抢单接入。</p></div>' +
         '<div class="head-actions"><span class="pill green"><span class="dot-status green"></span> 实时连接</span>' +
         '<button class="au-btn au-btn--ghost au-btn--sm" data-refresh-list>' + A.icon('refresh', 14) + ' 刷新</button></div></div>' +
@@ -35,10 +39,10 @@
         '<div class="chat-col chat-list-col" id="conv-list-col">' +
         '<div class="chat-list-head"><div class="filters"><input class="au-input" data-search placeholder="搜索访客、手机号、会话号" style="width:100%"></div>' +
         '<div class="chat-tabs">' +
-        '<button class="active" data-filter="all">全部<span data-cnt="all"></span></button>' +
-        '<button data-filter="pending">待接入<span data-cnt="pending"></span></button>' +
-        '<button data-filter="open">进行中<span data-cnt="open"></span></button>' +
-        '<button data-filter="closed">已结束<span data-cnt="closed"></span></button>' +
+        '<button class="active" data-filter="all">全部<span class="tab-badge" data-cnt="all"></span></button>' +
+        '<button data-filter="pending">待接入<span class="tab-badge" data-cnt="pending"></span></button>' +
+        '<button data-filter="open">进行中<span class="tab-badge" data-cnt="open"></span></button>' +
+        '<button data-filter="closed">已结束<span class="tab-badge" data-cnt="closed"></span></button>' +
         '</div></div><div class="chat-list" id="conv-list">' + A.skeleton(5) + '</div></div>' +
         '<div class="chat-col chat-main-col" id="conv-main"><div class="chat-empty">' + A.icon('chat', 40) + '<b>选择一个会话开始接待</b>从左侧列表进入会话，支持抢单、转接和内部备注</div></div>' +
         '<div class="chat-col chat-side" id="conv-side"><div class="side-block"><h4>访客信息</h4><div class="tiny muted">选择会话后展示访客档案、页面轨迹与线索信息。</div></div></div>' +
@@ -62,6 +66,7 @@
       loadList(root).then(function () {
         var target = ctx.params && ctx.params[0];
         if (target) openConversation(root, Number(target));
+        else if (CH.convs && CH.convs.length) openConversation(root, Number(CH.convs[0].id));
       });
     }
   });
@@ -148,7 +153,7 @@
       if (!list) return;
       ['all', 'pending', 'open', 'closed'].forEach(function (k) {
         var el = root.querySelector('[data-cnt="' + k + '"]');
-        if (el) el.textContent = d.counts[k] ? '(' + d.counts[k] + ')' : '';
+        if (el) el.textContent = d.counts[k] ? String(d.counts[k]) : '';
       });
       if (!d.conversations.length) {
         list.innerHTML = '<div class="empty-state" style="padding:40px 10px"><div class="em-ico">' + A.icon('chat', 20) + '</div><b>暂无会话</b>访客打开挂件后会自动出现</div>';

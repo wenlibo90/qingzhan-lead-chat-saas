@@ -305,8 +305,6 @@ const tagIds = tagDefs.map(([n, c, a]) => run('INSERT INTO tags (tenant_id, name
 
 run('INSERT INTO announcements (tenant_id, site_id, content, position, link, link_text, bg_color) VALUES (?,?,?,?,?,?,?)',
   [t1, site1, '10 月限时：专业版年付立减 2 个月，赠接入辅导', 'side', '/pricing', '查看详情', '#2563eb']);
-run('INSERT INTO announcements (tenant_id, site_id, content, position, link, link_text, bg_color, enabled) VALUES (?,?,?,?,?,?,?,0)',
-  [t1, site1, '双十一活动预告', 'side', '', '', '#8b5cf6']);
 run('INSERT INTO blacklist (tenant_id, site_id, type, value, reason) VALUES (?,?,?,?,?)', [t1, site1, 'ip', '203.0.113.66', '恶意刷消息']);
 run('INSERT INTO blacklist (tenant_id, site_id, type, value, reason) VALUES (?,?,?,?,?)', [t1, site1, 'ip', '198.51.100.23', '爬虫采集']);
 

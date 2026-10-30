@@ -527,6 +527,7 @@
     A.state.token = '';
     A.state.user = null;
     A.state.socket = null;
+    A._sideSig = null;
     LS.del('qz_admin_token');
     if (silent) A.toast('登录已失效，请重新登录', 'err');
     A.renderLogin();
@@ -569,7 +570,6 @@
         if (location.hash !== '#/dashboard') location.hash = '#/dashboard'; else A.route();
       }
       A.pollNotifications();
-      if (A.state.dark) document.documentElement.classList.add('au-dark');
     }).catch(function (err) {
       boot.hidden = true;
       if (!A.state.token) A.renderLogin();
@@ -580,11 +580,33 @@
   A.renderShell = function () {
     A.renderSidebar();
     A.renderTopbar();
+    A.refreshConvCounts();
   };
 
-  A.renderSidebar = function () {
+  var convCountTimer = null;
+  A.refreshConvCounts = function () {
+    clearTimeout(convCountTimer);
+    convCountTimer = setTimeout(function () {
+      if (!A.state.token) return;
+      A.api('/api/conversations?status=pending&limit=1' + A.siteQ()).then(function (d) {
+        var n = (d.counts && d.counts.pending) || 0;
+        if (n !== A.state.pendingConv) { A.state.pendingConv = n; A.renderSidebar(); }
+      }).catch(function () { });
+    }, 500);
+  };
+
+  A.renderSidebar = function (force) {
     var side = document.getElementById('sidebar');
-    var site = A.currentSite();
+    var sig = [
+      A.role(), A.state.siteId, (A.currentSite() || {}).id, (A.currentSite() || {}).name,
+      A.state.plan && A.state.plan.code, A.state.plan && A.state.plan.limits ? A.state.plan.limits.agents : '',
+      A.state.sites.length, A.trialDaysLeft(), window.I18N ? I18N.locale : ''
+    ].join('|');
+    if (!force && sig === A._sideSig) { A.syncNavBadges(); return; }
+    A._sideSig = sig;
+    var prevTop = 0;
+    var oldNav = side.querySelector('.side-nav');
+    if (oldNav) prevTop = oldNav.scrollTop;
     var navHtml = A.nav.map(function (group) {
       var items = group.items.filter(function (it) {
         return !it.roles || it.roles.indexOf(A.role()) > -1;
@@ -600,32 +622,33 @@
           '</button>';
       }).join('') + '</div>';
     }).join('');
-    var usage = A.state.plan ? (A.state.plan.limits.agents === -1 ? '不限坐席' : A.state.plan.limits.agents + ' 个坐席') : '';
-    var trialLeft = A.trialDaysLeft();
-    var planBadge = trialLeft != null ? '试用 ' + trialLeft + ' 天' : usage;
     side.innerHTML =
       '<div class="side-logo"><span class="side-logo-mark"><img src="/assets/logo.webp" alt=""></span><span><b>轻客服 SaaS</b><small>客服挂件 · 线索 CRM</small></span></div>' +
-      (site ? '<div class="side-site" data-site-switch><span class="site-ico">' + A.icon('globe', 14) + '</span><span class="site-meta"><b>' + A.esc(site.name) + '</b><span>' + A.esc(site.domain || site.site_key) + '</span></span>' + A.icon('grid', 14) + '</div>' : '') +
-      '<nav class="side-nav">' + navHtml + '</nav>' +
-      '<div class="side-plan"><b><span>' + (A.state.plan ? A.state.plan.name : '') + '</span><span class="pill ' + (trialLeft != null ? 'orange' : 'blue') + '">' + planBadge + '</span></b>' +
-      '<p>' + (trialLeft != null ? '专业版试用中，到期自动降级免费版，数据保留。' : A.can('crm') ? '转化闭环已开启，去看今天的线索。' : '升级专业版，解锁转化漏斗、意向打分与线索 CRM。') + '</p>' +
-      '<button data-go-billing>' + (A.can('crm') ? '查看用量' : '升级套餐') + '</button></div>';
+      '<nav class="side-nav">' + navHtml + '</nav>';
     A.$$('[data-nav]', side).forEach(function (btn) {
       btn.addEventListener('click', function () {
-        var key = btn.getAttribute('data-nav');
-        var def = A.nav.reduce(function (acc, g) { return acc.concat(g.items); }, []).filter(function (i) { return i.key === key; })[0];
-        if (def && def.feature && !A.can(def.feature)) {
-          A.upgrade(def.feature, '「' + def.label + '」需要升级到' + A.featureNeeded(def.feature) + '后使用');
-          return;
-        }
-        A.go(key);
+        A.go(btn.getAttribute('data-nav'));
         side.classList.remove('open');
       });
     });
-    var billing = side.querySelector('[data-go-billing]');
-    if (billing) billing.addEventListener('click', function () { A.go('billing'); });
-    var ss = side.querySelector('[data-site-switch]');
-    if (ss) ss.addEventListener('click', function () { A.openSiteSwitcher(); });
+    var newNav = side.querySelector('.side-nav');
+    if (newNav) newNav.scrollTop = prevTop;
+    if (A.state.route) A.markNav(A.state.route.page);
+    A.syncNavBadges();
+  };
+
+  A.syncNavBadges = function () {
+    var items = A.nav.reduce(function (acc, g) { return acc.concat(g.items); }, []);
+    items.forEach(function (it) {
+      if (!it.badge) return;
+      var btn = document.querySelector('#sidebar .nav-item[data-nav="' + it.key + '"]');
+      if (!btn) return;
+      var count = it.badge === 'chat' ? (A.state.pendingConv || 0) : (A.state.unread || 0);
+      var el = btn.querySelector('.n-badge');
+      if (!count) { if (el) el.parentNode.removeChild(el); return; }
+      if (!el) { el = document.createElement('span'); el.className = 'n-badge'; btn.appendChild(el); }
+      el.textContent = count > 99 ? '99+' : String(count);
+    });
   };
 
   A.renderTopbar = function () {
@@ -634,14 +657,23 @@
     var siteOptions = '<option value="">全部站点</option>' + A.state.sites.filter(function (s) { return !s.is_sandbox; }).map(function (s) {
       return '<option value="' + s.id + '"' + (String(s.id) === String(A.state.siteId) ? ' selected' : '') + '>' + A.esc(s.name) + '</option>';
     }).join('');
+    var curSite = A.currentSite();
+    var siteTitle = curSite ? curSite.name + (curSite.domain ? ' · ' + curSite.domain : '') : '全部站点';
+    var trLeft = A.trialDaysLeft();
+    var planName = trLeft != null ? '试用中' : (A.state.plan ? A.state.plan.name : '免费版');
+    var planMeta = trLeft != null ? '剩 ' + trLeft + ' 天' : (A.state.plan && A.state.plan.limits && A.state.plan.limits.agents !== -1 ? A.state.plan.limits.agents + ' 坐席' : '');
+    var planChip = A.role() === 'agent' ? '' :
+      '<button class="top-plan' + (trLeft != null ? ' is-trial' : '') + '" data-plan-chip title="' + A.esc('当前套餐：' + planName + (planMeta ? ' · ' + planMeta : '') + '，点击查看用量与套餐') + '">' +
+      '<span class="tp-dot"></span><span class="tp-name">' + A.esc(planName) + '</span>' +
+      (planMeta ? '<span class="tp-meta">' + A.esc(planMeta) + '</span>' : '') + '</button>';
     top.innerHTML =
       '<button class="top-icon-btn menu-toggle" data-menu aria-label="菜单">' + A.icon('menu', 17) + '</button>' +
       '<div class="topbar-title">' + A.esc(A.t(page.title || '数据概览')) + '<small>' + A.esc(A.t(page.subtitle || '')) + '</small></div>' +
       '<div class="topbar-spacer"></div>' +
       '<div class="top-actions">' +
       A.langSelectHtml() +
-      '<select class="top-select" data-site-filter aria-label="选择站点">' + siteOptions + '</select>' +
-      '<button class="top-icon-btn" data-density title="外观" aria-label="切换深浅色">' + A.icon(A.state.dark ? 'sun' : 'moon', 16) + '</button>' +
+      planChip +
+      '<select class="top-select" data-site-filter title="' + A.esc(siteTitle) + '" aria-label="选择站点">' + siteOptions + '</select>' +
       '<button class="top-icon-btn" data-bell aria-label="通知">' + A.icon('bell', 16) + (A.state.unread ? '<span class="dot"></span>' : '') + '</button>' +
       '<button class="top-user" data-user>' +
       A.avatarHtml(A.state.user, '', 15) +
@@ -655,12 +687,7 @@
       LS.set('qz_admin_site', A.state.siteId);
       A.renderSidebar();
       A.route();
-    });
-    top.querySelector('[data-density]').addEventListener('click', function () {
-      A.state.dark = !A.state.dark;
-      LS.set('qz_admin_dark', A.state.dark ? '1' : '0');
-      document.documentElement.classList.toggle('au-dark', A.state.dark);
-      A.renderTopbar();
+      A.refreshConvCounts();
     });
     var langSel = top.querySelector('[data-admin-lang]');
     if (langSel) {
@@ -668,6 +695,11 @@
       langSel.addEventListener('change', function () { A.setLocale(langSel.value); });
     }
     top.querySelector('[data-bell]').addEventListener('click', A.openNotifications);
+    var planChipEl = top.querySelector('[data-plan-chip]');
+    if (planChipEl) planChipEl.addEventListener('click', function () {
+      if (A.role() === 'admin') { A.go('billing'); return; }
+      A.toast('套餐与用量由管理员管理，当前：' + planName + (planMeta ? ' · ' + planMeta : ''), 'info');
+    });
     top.querySelector('[data-user]').addEventListener('click', A.openUserMenu);
   };
 
@@ -683,6 +715,10 @@
     return { page: seg[0] || 'dashboard', params: seg.slice(1), query: {} };
   };
 
+  A.markNav = function (page) {
+    A.$$('#sidebar .nav-item').forEach(function (n) { n.classList.toggle('active', n.getAttribute('data-nav') === page); });
+  };
+
   A.route = function () {
     var r = A.parseRoute();
     var def = A.pages[r.page];
@@ -690,19 +726,19 @@
     if (A.state.route && A.state.route.def && A.state.route.def.destroy) {
       try { A.state.route.def.destroy(); } catch (e) { }
     }
-    if (def.roles && def.roles.indexOf(A.role()) < 0) {
-      document.getElementById('page').innerHTML = A.lockPage('该页面仅对' + (def.roles.indexOf('operator') > -1 ? '管理员/运营' : '管理员') + '开放', '权限不足');
-      return;
-    }
-    if (def.feature && !A.can(def.feature)) {
-      document.getElementById('page').innerHTML = A.lockPage(def.title + '需要' + A.featureNeeded(def.feature) + '能力', def.title);
-      return;
-    }
     A.state.route = { page: r.page, params: r.params, def: def, query: r.query };
     A.renderSidebar();
     A.renderTopbar();
-    A.$$('.nav-item').forEach(function (n) { n.classList.toggle('active', n.getAttribute('data-nav') === r.page); });
+    A.markNav(r.page);
     var container = document.getElementById('page');
+    if (def.roles && def.roles.indexOf(A.role()) < 0) {
+      container.innerHTML = A.lockPage('该页面仅对' + (def.roles.indexOf('operator') > -1 ? '管理员/运营' : '管理员') + '开放', '权限不足');
+      return;
+    }
+    if (def.feature && !A.can(def.feature)) {
+      container.innerHTML = A.lockPage(def.title + '需要' + A.featureNeeded(def.feature) + '能力', def.title);
+      return;
+    }
     container.innerHTML = '<div class="empty-state"><div class="em-ico">' + A.icon('refresh', 20) + '</div>加载中...</div>';
     try {
       def.render(container, { params: r.params, query: r.query });
@@ -823,24 +859,6 @@
     });
   };
 
-  A.openSiteSwitcher = function () {
-    var body = '<div class="grid" style="gap:7px">' + A.state.sites.filter(function (s) { return !s.is_sandbox; }).map(function (s) {
-      return '<button class="au-list-item' + (String(s.id) === String(A.state.siteId) ? ' au-active' : '') + '" data-sid="' + s.id + '" style="border:1px solid rgba(148,163,184,.18)">' +
-        '<span class="avatar-sm">' + A.icon('globe', 14) + '</span><span class="au-list-item-content"><span class="au-list-item-title">' + A.esc(s.name) + '</span><span class="au-list-item-desc">' + A.esc(s.domain || s.site_key) + '</span></span></button>';
-    }).join('') + '</div>' + (A.role() !== 'agent' ? '<button class="au-btn au-btn--ghost mt-2" style="width:100%" data-newsite>+ 添加站点</button>' : '');
-    var m = A.modal({ title: '切换站点', subtitle: '不同站点的访客、会话与线索独立隔离', body: body });
-    A.$$('[data-sid]', m.el).forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        A.state.siteId = btn.getAttribute('data-sid');
-        LS.set('qz_admin_site', A.state.siteId);
-        m.close();
-        A.renderSidebar(); A.renderTopbar(); A.route();
-      });
-    });
-    var ns = m.el.querySelector('[data-newsite]');
-    if (ns) ns.addEventListener('click', function () { m.close(); A.go('sites'); });
-  };
-
   // ---------------- upgrade ----------------
   A.upgrade = function (feature, message) {
     A.api('/api/billing').then(function (d) {
@@ -891,11 +909,9 @@
         A.renderSidebar();
         A.toast((d && d.title || '新通知') + (d && d.content ? '：' + d.content : ''), 'ok');
       });
-      s.on('conversation:new', function () {
-        A.state.pendingConv += 1;
-        A.renderSidebar();
-      });
-      s.on('conversation:update', function () { A.renderSidebar(); });
+      s.on('conversation:new', function () { A.refreshConvCounts(); });
+      s.on('conversation:update', function () { A.refreshConvCounts(); });
+      s.on('message:new', function () { A.refreshConvCounts(); });
     }
     if (window.io) return connect();
     var script = document.createElement('script');

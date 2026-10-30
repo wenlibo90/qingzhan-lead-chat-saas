@@ -11,6 +11,27 @@
 .ops-sidebar .side-site { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.08); }
 .ops-sidebar .side-site .site-meta b { color: #e2e8f0; }
 .ops-sidebar .side-site .site-meta span { color: #64748b; }
+.ops-sidebar .side-site {
+  display: flex; align-items: center; gap: 8px; margin: 0 4px 14px; padding: 9px 10px;
+  border: 1px solid rgba(255,255,255,.08); border-radius: 12px;
+}
+.ops-sidebar .side-site .site-ico {
+  width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0; display: grid; place-items: center;
+  background: rgba(139,92,246,.16); color: #c4b5fd;
+}
+.ops-sidebar .side-site .site-meta { flex: 1; min-width: 0; }
+.ops-sidebar .side-site .site-meta b { display: block; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ops-sidebar .side-site .site-meta span { font-size: 10px; }
+.ops-sidebar .side-plan {
+  margin: 8px 4px 0; padding: 13px; border-radius: 14px;
+  background: rgba(139,92,246,.08); border: 1px solid rgba(139,92,246,.2);
+}
+.ops-sidebar .side-plan b { font-size: 12px; display: flex; justify-content: space-between; gap: 6px; align-items: center; }
+.ops-sidebar .side-plan p { font-size: 10.5px; margin: 5px 0 9px; line-height: 1.5; }
+.ops-sidebar .side-plan button {
+  width: 100%; border: none; border-radius: 9px; padding: 7px; font-size: 11.5px; font-weight: 600;
+  color: #fff; background: linear-gradient(135deg,#8b5cf6,#6366f1); cursor: pointer;
+}
 .ops-brand-sub { font-size: 9px; color: #7c3aed; letter-spacing: .1em; }
 .ops-brand-pill { display: inline-flex; align-items: center; margin-left: 6px; padding: 3px 8px; border: 1px solid rgba(255,255,255,.24); border-radius: 999px; background: rgba(255,255,255,.16); font-size: 10px; font-weight: 700; letter-spacing: .02em; }
 .ops-login-note { margin: 0; padding: 16px 18px; border: 1px solid rgba(255,255,255,.18); border-radius: 16px; background: rgba(8,20,45,.24); backdrop-filter: blur(10px); }
