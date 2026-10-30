@@ -124,7 +124,8 @@
       '<div class="login-brand">' +
         '<div class="login-logo"><span class="login-logo-mark"><img src="/assets/logo.webp" alt=""></span>轻客服 SaaS<span class="ops-brand-pill">平台运营</span></div>' +
         '<div class="login-hero">' +
-          '<h1>一条自助线，<br>一条销售线。</h1>' +
+          '<h1>运营管理</h1>' +
+          '<h1>一条自助线，一条销售线。</h1>' +
           '<p>从注册账号、工作空间到试用订阅与销售申请，平台运营在一个控制台里完成。客户数据与运营数据完全隔离。</p>' +
           '<div class="login-points">' +
             '<div class="login-point"><span>' + O.icon('check', 13) + '</span>注册账号、工作空间、订阅订单统一视图</div>' +

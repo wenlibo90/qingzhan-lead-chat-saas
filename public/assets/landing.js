@@ -32,6 +32,30 @@
     revealEls.forEach(function (el) { el.classList.add('in'); });
   }
 
+  // 首屏光团跟随鼠标做视差（transform 仍在跑漂移动画，这里用独立的 translate 叠加）
+  var hero = document.querySelector('.hero');
+  var heroGlows = hero ? Array.prototype.slice.call(hero.querySelectorAll('.hero-glow')) : [];
+  if (hero && heroGlows.length && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    var px = 0, py = 0, pRaf = null;
+    var paintGlow = function () {
+      pRaf = null;
+      heroGlows.forEach(function (g, i) {
+        var k = i === 0 ? 46 : -32;
+        g.style.translate = (px * k).toFixed(1) + 'px ' + (py * k * .72).toFixed(1) + 'px';
+      });
+    };
+    hero.addEventListener('pointermove', function (e) {
+      var r = hero.getBoundingClientRect();
+      px = (e.clientX - r.left) / r.width - .5;
+      py = (e.clientY - r.top) / r.height - .5;
+      if (!pRaf) pRaf = requestAnimationFrame(paintGlow);
+    }, { passive: true });
+    hero.addEventListener('pointerleave', function () {
+      px = 0; py = 0;
+      if (!pRaf) pRaf = requestAnimationFrame(paintGlow);
+    });
+  }
+
   // billing toggle
   var billing = 'month';
   var billBtns = Array.prototype.slice.call(document.querySelectorAll('[data-billing]'));
@@ -96,6 +120,14 @@
           if (other !== item) other.open = false;
         });
       }
+    });
+  });
+
+  // 教程示例里的可选对勾与开关
+  Array.prototype.slice.call(document.querySelectorAll('.gs-check, .gs-switch')).forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var on = btn.classList.toggle('on');
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
   });
 
