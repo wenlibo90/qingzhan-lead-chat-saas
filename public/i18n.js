@@ -37,7 +37,7 @@
       pathSelfCta: '免费注册', pathTeamTag: '团队 / 企业', pathTeamTitle: '预约演示，按团队方案接入',
       pathTeamDesc: '适合多站点、客服团队、外贸独立站和需要合同/发票的客户。顾问会用你的网站做一次真实接入演示，再确定套餐与权限。',
       pathTeamCta: '预约 20 分钟演示', pricingTitle: '先免费验证，再为增长付费',
-      pricingSub: '所有付费套餐均含无限访客、HTTPS、数据隔离与行为采集开关。年付按 10 个月计费。',
+      pricingSub: '所有付费套餐均含无限访客、HTTPS、数据隔离与行为采集开关，年付按 10 个月计费。',
       trialKicker: '团队 / 企业通道', trialTitle: '让顾问带你做一次<br>真实接入演示',
       trialSub: '提交信息后，顾问会带着你的网站做一次真实接入演示。想自己先研究，可以直接免费注册。',
       trialPoint1: '14 天全功能试用', trialPoint2: '免费接入辅导', trialPoint3: '随时降级免费版',
