@@ -123,10 +123,9 @@ app.get(['/demo', '/demo/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'd
 app.get('/r/:code', (req, res) => {
   const code = String(req.params.code || '').trim();
   referralService.recordVisit(code, (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0], req.headers['user-agent']);
-  res.redirect(302, '/signup/?ref=' + encodeURIComponent(code));
+  res.redirect(302, '/?signup=1&ref=' + encodeURIComponent(code));
 });
 app.get(['/promote', '/promote/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'promote.html')));
-app.get(['/signup', '/signup/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'signup', 'index.html')));
 app.get(['/admin', '/admin/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin', 'index.html')));
 app.get(['/ops', '/ops/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'ops', 'index.html')));
 app.use('/admin', express.static(path.join(PUBLIC_DIR, 'admin'), { index: 'index.html', maxAge: 0 }));

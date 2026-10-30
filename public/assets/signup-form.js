@@ -98,7 +98,15 @@
         .then(function (d) {
           try { localStorage.setItem('qz_admin_token', d.token); } catch (e) { }
           if (submitBtn) submitBtn.textContent = successLabel;
-          location.href = d.next || '/admin/#/onboarding';
+          var next = d.next || '/admin/#/onboarding';
+          var parts = next.split('#');
+          if (parts[0] === location.pathname) {
+            // 同页注册（如后台登录页弹窗）：刷新以进入工作台
+            if (parts[1]) location.hash = '#' + parts[1];
+            location.reload();
+          } else {
+            location.href = next;
+          }
         })
         .catch(function (err) {
           if (submitBtn) {

@@ -137,17 +137,16 @@
       '</div>' +
       '<div class="login-form-wrap"><form class="login-card" id="ops-login-form">' +
         '<div class="flex items-center justify-between mb-2"><h2 style="margin:0">运营登录</h2><span class="ops-badge">平台运营</span></div>' +
-        '<p class="muted">平台运营账号独立于客户账号体系。</p>' +
+        '<p class="muted">平台运营账号独立于客户账号体系</p>' +
         '<div class="au-form-group"><label class="au-label">运营邮箱</label><input class="au-input" name="email" type="email" value="ops@platform.com" autocomplete="username" required></div>' +
         '<div class="au-form-group"><label class="au-label">密码</label><input class="au-input" name="password" type="password" value="ops123" autocomplete="current-password" required></div>' +
         '<div class="flex items-center justify-between mb-2"><label class="small muted flex items-center gap-1"><input type="checkbox" checked> 记住登录状态</label><span class="small muted">仅限平台成员</span></div>' +
         '<button class="au-btn au-btn--primary au-btn--lg" style="width:100%" type="submit">进入运营控制台</button>' +
         '<div id="ops-error" class="notice danger mt-2" style="display:none"></div>' +
         '<div class="demo-accounts"><p>演示账号（点击自动登录）</p><div class="demo-row">' +
-          '<button type="button" class="demo-chip" data-email="ops@platform.com" data-pass="ops123">超级管理员 · ops@platform.com</button>' +
-          '<button type="button" class="demo-chip" data-email="sales@platform.com" data-pass="sales123">销售 · sales@platform.com</button>' +
+          '<button type="button" class="demo-chip" data-email="ops@platform.com" data-pass="ops123">平台管理员</button>' +
+          '<button type="button" class="demo-chip" data-email="sales@platform.com" data-pass="sales123">销售</button>' +
         '</div></div>' +
-        '<div class="tiny muted mt-2" style="text-align:center">客户账号请前往 <a href="/admin/" style="color:#2563eb">客户后台</a> 登录</div>' +
       '</form></div>';
     var form = document.getElementById('ops-login-form');
     form.addEventListener('submit', function (e) {

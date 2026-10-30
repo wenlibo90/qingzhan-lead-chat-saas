@@ -378,16 +378,11 @@
     document.getElementById('app').hidden = true;
     var screen = document.getElementById('login-screen');
     screen.hidden = false;
-    screen.classList.add('has-image');
-    var feature = function (img, icon, title, tone) {
-      return '<article class="login-feature ' + tone + '">' +
-        '<img src="/assets/login/' + img + '" alt="" loading="lazy">' +
-        '<div class="login-feature-head"><span>' + A.icon(icon, 15) + '</span><b>' + A.t(title) + '</b></div>' +
-        '</article>';
-    };
+    screen.classList.add('has-bg');
     screen.innerHTML =
       '<div class="login-brand">' +
-        '<div class="login-brandline"><span class="login-logo-mark"><img src="/assets/logo.webp" alt=""></span><span>' + A.t('轻客服 SaaS') + '</span></div>' +
+        '<div class="login-logo"><span class="login-logo-mark"><img src="/assets/logo.webp" alt=""></span>' + A.t('轻客服 SaaS') +
+          '<span class="login-brand-pill">' + A.t('工作台') + '</span></div>' +
         '<div class="login-stage" aria-hidden="true">' +
           '<div class="lv lv-bubble lv-bubble--1"><img src="/assets/login/login-03.webp" alt=""></div>' +
           '<div class="lv lv-bubble lv-bubble--2"><img src="/assets/login/login-04.webp" alt=""></div>' +
@@ -396,22 +391,17 @@
           '<div class="lv lv-tag"><span class="lv-tag-pill"><i></i>' + A.t('线索沉淀') + '</span></div>' +
           '<div class="lv lv-dash"><img src="/assets/login/login-01.webp" alt=""></div>' +
         '</div>' +
-        '<div class="login-copy">' +
-          '<h1><span>' + A.t('客服挂件接住访客，') + '</span><br><span>' + A.t('线索 CRM 沉淀商机') + '</span></h1>' +
-          '<p>' + A.t('从访客接入到商机沉淀，一站式提升转化') + '</p>' +
-          '<p class="login-desc">一段客服挂件接入网站，实时接待、记录行为、主动触达，再把咨询沉淀为线索，进入线索CRM跟进成交。</p>' +
-          '<div class="login-quick">' +
-            '<span class="login-quick-item">' + A.icon('check', 12) + '异步懒加载，不阻塞宿主网站首屏</span>' +
-            '<span class="login-quick-item">' + A.icon('check', 12) + '实时聊天+无埋点行为采集+意向打分</span>' +
-            '<span class="login-quick-item">' + A.icon('check', 12) + '多租户数据隔离，RBAC权限体系</span>' +
+        '<div class="login-hero">' +
+          '<h1>' + A.t('客服挂件接住访客，') + '<br>' + A.t('线索 CRM 沉淀商机') + '</h1>' +
+          '<p>' + A.t('一段客服挂件接入网站，实时接待、记录行为、主动触达，再把咨询沉淀为线索，进入线索 CRM 跟进成交。') + '</p>' +
+          '<div class="login-points">' +
+            '<div class="login-point"><span>' + A.icon('check', 13) + '</span>' + A.t('异步懒加载，不阻塞宿主网站首屏') + '</div>' +
+            '<div class="login-point"><span>' + A.icon('check', 13) + '</span>' + A.t('实时聊天 + 无埋点行为采集 + 意向打分') + '</div>' +
+            '<div class="login-point"><span>' + A.icon('check', 13) + '</span>' + A.t('多租户数据隔离，RBAC 权限体系') + '</div>' +
           '</div>' +
+          '<div class="login-code">&lt;script async src="https://Your Domain Name/qz.js?YOUR_LOADER_TOKEN"&gt;&lt;/script&gt;</div>' +
+          '<div class="login-foot">© 2026 ' + A.t('轻客服 SaaS') + ' · ' + A.t('客服挂件接住访客，线索CRM沉淀商机') + '</div>' +
         '</div>' +
-        '<div class="login-features">' +
-          feature('login-07.webp', 'chat', '在线接待', 'is-blue') +
-          feature('login-08.webp', 'leads', '线索沉淀', 'is-warm') +
-          feature('login-09.webp', 'chart', '数据复盘', 'is-cyan') +
-        '</div>' +
-        '<div class="login-foot">2026轻客服SaaS·客服挂件接住访客，线索CRM沉淀商机</div>' +
       '</div>' +
       '<div class="login-form-wrap"><form class="login-card" id="login-form">' +
         '<div class="login-mobile-brand"><span class="login-logo-mark"><img src="/assets/logo.webp" alt=""></span><b>' + A.t('轻客服 SaaS') + '</b></div>' +
@@ -419,14 +409,14 @@
         '<p class="login-sub">' + A.t('使用注册账号或团队账号登录，也可点击演示账号快速体验。') + '</p>' +
         '<div class="au-form-group login-field"><label class="au-label">' + A.t('手机号或邮箱') + '</label><input class="au-input" type="text" name="identifier" placeholder="' + A.t('手机号 / you@company.com') + '" autocomplete="username" required></div>' +
         '<div class="au-form-group login-field"><label class="au-label">' + A.t('密码') + '</label><input class="au-input" type="password" name="password" placeholder="' + A.t('请输入密码') + '" autocomplete="current-password" required></div>' +
-        '<div class="login-options"><label class="login-remember"><input type="checkbox" checked><span class="login-check" aria-hidden="true"></span><span>' + A.t('记住登录状态') + '</span></label><span class="login-register">' + A.t('没有账号？') + ' <a href="/signup">' + A.t('免费注册') + '</a></span></div>' +
+        '<div class="login-options"><label class="login-remember"><input type="checkbox" checked><span class="login-check" aria-hidden="true"></span><span>' + A.t('记住登录状态') + '</span></label><span class="login-register">' + A.t('没有账号？') + ' <a href="#" data-login-signup>' + A.t('免费注册') + '</a></span></div>' +
         '<button class="au-btn au-btn--primary au-btn--lg login-submit" type="submit">' + A.t('进入工作台') + '</button>' +
+        '<div id="login-error" class="notice danger mt-2" style="display:none"></div>' +
         '<div class="demo-accounts"><p>' + A.t('演示账号（点击自动登录）') + '</p><div class="demo-row">' +
-          '<button type="button" class="demo-chip" data-email="admin@demo.com" data-pass="admin123">管理员 · 林晓</button>' +
-          '<button type="button" class="demo-chip" data-email="ops@demo.com" data-pass="ops123">运营 · 周敏</button>' +
-          '<button type="button" class="demo-chip" data-email="agent@demo.com" data-pass="agent123">客服 · 陈曦</button>' +
+          '<button type="button" class="demo-chip" data-email="admin@demo.com" data-pass="admin123">' + A.t('管理员 · 林晓') + '</button>' +
+          '<button type="button" class="demo-chip" data-email="ops@demo.com" data-pass="ops123">' + A.t('运营 · 周敏') + '</button>' +
+          '<button type="button" class="demo-chip" data-email="agent@demo.com" data-pass="agent123">' + A.t('客服 · 陈曦') + '</button>' +
         '</div></div>' +
-        '<div id="login-error" class="notice danger" style="display:none"></div>' +
         '<div class="login-ops">' + A.t('平台运营账号请前往') + ' <a href="/ops/">' + A.t('运营后台') + '</a></div>' +
       '</form></div>';
     var form = document.getElementById('login-form');
@@ -454,14 +444,59 @@
       screen.addEventListener('pointermove', screen._qzParallax, { passive: true });
     }
     var submitBtn = form.querySelector('button[type=submit]');
+    var signupLink = form.querySelector('[data-login-signup]');
+    if (signupLink) signupLink.addEventListener('click', function (e) {
+      e.preventDefault();
+      openSignupDialog();
+    });
+    function openSignupDialog() {
+      var mask = document.createElement('div');
+      mask.className = 'login-signup-mask';
+      mask.innerHTML =
+        '<div class="login-signup-card" role="dialog" aria-modal="true">' +
+          '<button class="login-signup-close" type="button" aria-label="关闭">&times;</button>' +
+          '<aside class="login-signup-aside">' +
+            '<span class="login-signup-kicker">' + A.t('免费注册 · 14 天专业版试用') + '</span>' +
+            '<h3>' + A.t('注册一个账号') + '<br><em>' + A.t('把自己的网站接进来') + '</em></h3>' +
+            '<p>' + A.t('注册只需要手机号和密码。进入后台后添加你的网站，复制一段 JS 放到自己的页面，真实访客就能看到客服挂件、行为轨迹和线索表单。') + '</p>' +
+            '<div class="login-signup-points"><span>' + A.t('注册只要 30 秒') + '</span><span>' + A.t('后台添加自己的网站') + '</span><span>' + A.t('直接跑真实场景') + '</span></div>' +
+            '<p class="login-signup-note">' + A.t('轻客服 SaaS · 个人网站和应用不需要复杂流程，快速接入。') + '</p>' +
+          '</aside>' +
+          '<div class="login-signup-main">' +
+            '<div class="login-signup-head"><h3>' + A.t('创建账号') + '</h3><p>' + A.t('手机号用于登录和接收接入提醒，不会对外展示。') + '</p></div>' +
+            '<form class="login-signup-form" novalidate>' +
+              '<input type="hidden" name="ref">' +
+              '<div class="signup-ref" data-ref-banner hidden>' + A.t('你正在通过好友邀请注册，首单付费后邀请人将获得推广奖励。') + '</div>' +
+              '<div class="au-form-group"><label class="au-label">' + A.t('手机号') + '</label>' +
+                '<div class="signup-phone-row"><input class="au-input" name="phone" type="tel" maxlength="11" placeholder="' + A.t('请输入 11 位手机号') + '" autocomplete="tel">' +
+                '<button type="button" class="au-btn au-btn--ghost signup-code-btn" data-send-code>' + A.t('获取验证码') + '</button></div>' +
+                '<div class="signup-hint" data-code-hint></div></div>' +
+              '<div class="au-form-group"><label class="au-label">' + A.t('验证码') + '</label><input class="au-input" name="code" type="text" maxlength="6" placeholder="' + A.t('6 位短信验证码') + '" inputmode="numeric" autocomplete="one-time-code"></div>' +
+              '<div class="au-form-group"><label class="au-label">' + A.t('密码') + '</label><input class="au-input" name="password" type="password" minlength="6" placeholder="' + A.t('至少 6 位，用于登录后台') + '" autocomplete="new-password"></div>' +
+              '<div class="signup-agree"><label><input type="checkbox" name="agree" checked> <span>' + A.t('我已阅读并同意') + '</span> <a href="/privacy.html" target="_blank">' + A.t('隐私政策') + '</a> <span>' + A.t('与') + '</span> <a href="#" onclick="return false">' + A.t('服务条款') + '</a></label></div>' +
+              '<div class="s-error" data-error></div>' +
+              '<button class="au-btn au-btn--primary login-submit" type="submit" data-submit>' + A.t('注册并进入后台') + '</button>' +
+            '</form>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(mask);
+      var close = function () { mask.remove(); };
+      mask.querySelector('.login-signup-close').addEventListener('click', close);
+      mask.addEventListener('click', function (ev) { if (ev.target === mask) close(); });
+      var onEsc = function (ev) { if (ev.key === 'Escape') { close(); document.removeEventListener('keydown', onEsc); } };
+      document.addEventListener('keydown', onEsc);
+      var signupForm = mask.querySelector('.login-signup-form');
+      if (window.QingkeSignup) window.QingkeSignup.mount(signupForm, { scope: mask });
+      setTimeout(function () { var p = signupForm.querySelector('[name=phone]'); if (p) p.focus(); }, 60);
+    }
     var doLogin = function (identifier, password, sourceBtn) {
       submitBtn.disabled = true;
-      submitBtn.textContent = '登录中...';
+      submitBtn.textContent = A.t('登录中...');
       errBox.style.display = 'none';
       A.$$('.demo-chip', form).forEach(function (c) { c.disabled = true; });
       if (sourceBtn) sourceBtn.classList.add('is-loading');
       fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identifier: identifier, password: password }) })
-        .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || '登录失败'); return d; }); })
+        .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || A.t('登录失败')); return d; }); })
         .then(function (data) {
           A.state.token = data.token;
           LS.set('qz_admin_token', data.token);

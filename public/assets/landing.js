@@ -238,6 +238,8 @@
     document.body.classList.add('signup-open');
     signupModal.focus();
   }
+  // 带 ?signup=1 或 ?ref= 参数进入时直接弹出注册弹窗
+  if (/[?&](signup=1|ref=)/.test(location.search)) openSignup();
   document.addEventListener('click', function (e) {
     var trigger = e.target.closest ? e.target.closest('[data-signup]') : null;
     if (!trigger) return;
