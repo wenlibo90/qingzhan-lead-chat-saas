@@ -1,5 +1,9 @@
 'use strict';
 
+const ip2 = (() => {
+  try { return require('ip2region/node'); } catch { return null; }
+})();
+
 const REGIONS = [
   { province: '广东', city: '深圳', weight: 18 },
   { province: '北京', city: '北京', weight: 15 },
@@ -15,50 +19,105 @@ const REGIONS = [
   { province: '湖南', city: '长沙', weight: 3 }
 ];
 
-function hashIp(ip) {
-  let h = 2166136261;
-  const str = String(ip || '0.0.0.0');
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return Math.abs(h);
-}
+let queryPromise = null;
+let queryFailed = false;
 
 function isPrivate(ip) {
-  return /^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1|localhost)/.test(String(ip || ''));
+  return /^(10\.|127\.|169\.254\.|192\.168\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|172\.(1[6-9]|2\d|3[01])\.|::1$|fe80:|fc[0-9a-f]{2}:|fd[0-9a-f]{2}:)/i.test(String(ip || ''));
+}
+
+function cleanIp(ip) {
+  return String(ip || '').trim().replace(/^::ffff:/i, '');
+}
+
+function trimProvince(name) {
+  const value = String(name || '').trim();
+  if (!value) return '';
+  return value
+    .replace(/(壮族自治区|回族自治区|维吾尔自治区|特别行政区|自治区|省|市)$/, '')
+    .trim() || value;
+}
+
+function trimCity(name) {
+  const value = String(name || '').trim();
+  if (!value) return '';
+  return value
+    .replace(/(自治州|自治县|地区|林区|盟|市)$/, '')
+    .trim() || value;
+}
+
+function lookupService() {
+  if (!ip2 || !ip2.IP2Region) return Promise.resolve(null);
+  if (queryFailed) return Promise.resolve(null);
+  if (!queryPromise) {
+    const families = String(process.env.GEO_FAMILIES || '4,6')
+      .split(',')
+      .map((v) => Number(v.trim()))
+      .filter((v) => v === 4 || v === 6);
+    queryPromise = ip2.IP2Region.open({ families: families.length ? families : [4, 6] })
+      .catch((err) => {
+        queryFailed = true;
+        if (process.env.GEO_DEBUG === '1') console.warn('[geo] ip2region 加载失败', err.message);
+        return null;
+      });
+  }
+  return queryPromise;
+}
+
+async function lookupIp2Region(ip) {
+  const query = await lookupService();
+  if (!query) return null;
+  try {
+    const result = query.lookup(ip);
+    if (!result) return null;
+    const province = trimProvince(result.subdivisions && result.subdivisions[0] && result.subdivisions[0].name);
+    const city = trimCity(result.city && result.city.name);
+    const country = String(result.country && result.country.name || '').trim();
+    if (!country && !province && !city) return null;
+    return {
+      country: country || '未知',
+      province: province || '未知',
+      city: city || '',
+      isp: String(result.isp || '').trim(),
+      provider: 'ip2region'
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function lookupApi(ip) {
+  if (!process.env.GEO_API) return null;
+  try {
+    const url = process.env.GEO_API.replace('{ip}', encodeURIComponent(ip));
+    const resp = await fetch(url, { signal: AbortSignal.timeout(1500) });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const province = data.province || data.region || '';
+    const city = data.city || '';
+    if (!province && !city) return null;
+    return { country: data.country || '中国', province, city, isp: data.isp || '', provider: 'api' };
+  } catch {
+    return null;
+  }
 }
 
 /**
- * 本地 IP 归属地解析。生产环境可通过 GEO_API 接入高德/腾讯位置服务，
- * 未配置时使用确定性映射，保证同一 IP 始终归入同一区域，便于演示与统计。
+ * IP 归属地解析。默认使用内置 ip2region 离线库（IPv4/IPv6），
+ * 配置 GEO_API 时优先使用第三方接口，接口失败自动回退到离线库。
  */
 async function locate(ip) {
-  if (process.env.GEO_API) {
-    try {
-      const url = process.env.GEO_API.replace('{ip}', encodeURIComponent(ip));
-      const resp = await fetch(url, { signal: AbortSignal.timeout(1500) });
-      if (resp.ok) {
-        const data = await resp.json();
-        const province = data.province || data.region || '';
-        const city = data.city || '';
-        if (province) return { country: '中国', province, city, provider: 'api' };
-      }
-    } catch {
-      /* fall through to local resolver */
-    }
-  }
-  if (isPrivate(ip)) return { country: '本地', province: '本地网络', city: '内网', provider: 'local' };
-  const h = hashIp(ip);
-  const total = REGIONS.reduce((s, r) => s + r.weight, 0);
-  let cursor = h % total;
-  for (const region of REGIONS) {
-    cursor -= region.weight;
-    if (cursor < 0) {
-      return { country: '中国', province: region.province, city: region.city, provider: 'local' };
-    }
-  }
-  return { country: '中国', province: '广东', city: '深圳', provider: 'local' };
+  const value = cleanIp(ip);
+  if (!value) return { country: '未知', province: '未知', city: '', provider: 'unknown' };
+  if (isPrivate(value)) return { country: '本地', province: '本地网络', city: '内网', provider: 'local' };
+
+  const api = await lookupApi(value);
+  if (api) return api;
+
+  const local = await lookupIp2Region(value);
+  if (local) return local;
+
+  return { country: '未知', province: '未知', city: '', provider: 'unknown' };
 }
 
 function regionList() {

@@ -4,10 +4,12 @@
 
 - 访客挂件：右下角客服、实时聊天、主动触发、知识库、录屏、公告、广告拦截检测
 - 客户管理后台：会话接待、访客 360 档案、线索 CRM、报表、自动化、知识库、站点/挂件配置、团队权限、套餐与工单
+- 网站分析：流量概览、实时数据、来源、内容、受众、事件与 Web Vitals，支持环比、趋势和 CSV 导出
 - 对外落地页：产品介绍、套餐价格、接入教程、案例、自助注册与团队演示申请
 - 平台运营后台：注册账号、工作空间、试用/订阅、订单收入、申请线索、支持工单、风控、平台成员与操作审计
 - 双线增长：个人站长自助注册 + 团队/企业销售申请，共用一套挂件与业务引擎
 - 自助订阅：订单、月付/年付、模拟支付、支付回调验签、幂等开通、发票记录与到期降级
+- 支付宝电脑网站支付：APPID/公私钥/网关配置后自动启用，下单跳转支付宝收银台，异步通知验签后开通套餐
 - 增长闭环：PQL 自动识别高意向工作空间并进入销售线索池；客户可在后台提交支持工单
 - 推广激励：专属邀请链接、注册归因、首单 20% 奖励、7 天结算、提现申请与运营审核
 - 国际化：简体中文、繁体中文、英语、日语、韩语；覆盖落地页、注册、后台导航/登录、个人资料和访客挂件
@@ -111,8 +113,9 @@ npm start
 
 - 套餐页选择月付或年付，服务端按 `plans.js` 计算订单金额，客户端传入的价格无效。
 - 开发环境 `PAYMENT_PROVIDER=mock` 时可直接模拟支付；生产环境需接入支付渠道适配器。
-- 支付回调地址：`POST /api/public/payments/webhook/:provider`。
-- 回调使用 `x-payment-signature` HMAC-SHA256 验签，校验订单金额，并以 `event_id` 做幂等。
+- 支付宝回调地址：`POST /api/public/payments/alipay/notify`，同步返回：`GET /api/public/payments/alipay/return`。
+- 支付宝使用官方 SDK 做 RSA2 验签，校验 APPID、金额、订单号，并以 `notify_id` 做幂等。
+- 通用模拟回调地址：`POST /api/public/payments/webhook/:provider`，使用 `x-payment-signature` HMAC-SHA256 验签。
 - 支付成功后立即更新套餐、订阅周期、发票号，并发送站内通知。
 - 订阅到期先进入 7 天宽限期（`past_due`），仍未续费则降级免费版；取消续费在当前周期结束后降级。
 - 已支付订单生成 `invoice_no` 和发票记录；PDF/税务对接属于后续能力。
@@ -145,7 +148,7 @@ PQL 由生命周期任务每小时评估：工作空间已安装 JS、访客数�
 | 认证 | scrypt 密码哈希 + HMAC-SHA256 签名 Token；账号与工作空间成员分离，平台运营独立认证域 |
 | 前端 | 原生 ES5/ES2017 + Apollo UI（玻璃拟态），无构建步骤 |
 | 实时 | WebSocket，房间模型 `tenant:*` / `conv:*` / `agent:*` |
-| 测试 | Node 脚本冒烟测试（122 项）+ Playwright 浏览器测试（41 项） |
+| 测试 | Node 脚本冒烟测试（143 项）+ Playwright 浏览器测试（42 项） |
 
 ## 目录结构
 
@@ -159,20 +162,20 @@ server/
   socket.js           访客/客服实时协议
   upload.js           文件上传
   routes/             public / payments / auth / signup / onboarding / ops / support /
-                      conversations / visitors / leads / reports / config / settings / external / landing
-  services/           geo / scoring / presence / ratify / notify / ai / provision / lifecycle /
+                      conversations / visitors / leads / analytics / reports / config / settings / external / landing
+  services/           geo / scoring / presence / analytics / ratify / notify / ai / provision / lifecycle /
                       billing / pql
   test/               smoke.js / ui.js
 public/
   index.html          产品落地页
   admin/              客户管理后台 SPA（hash 路由，多页面脚本）
   ops/                平台运营后台 SPA（账号、工作空间、申请、订阅、订单、工单、推广、风控）
-  signup/             自助注册页
   widget.js           旧版加载器入口（保留兼容）
   qz.js               新加载器（服务端按令牌注入站点，禁止直接访问）
   widget-core.js      挂件内核（通过 /qz-core.js 提供）
   demo/               演示宿主站点
   privacy.html        隐私说明
+  terms.html          服务条款
   assets/             Apollo UI 与落地页样式
 data/                 SQLite 数据库（运行时生成）
 uploads/              上传文件（运行时生成）
@@ -205,10 +208,10 @@ docs/ARCHITECTURE.md  架构、数据库与接口规划
 # 需先启动服务
 npm start
 
-# API + 实时通讯冒烟测试（122 项）
+# API + 实时通讯冒烟测试（143 项）
 npm test
 
-# 浏览器端到端测试（36 项，需要 Playwright Chromium）
+# 浏览器端到端测试（42 项，需要 Playwright Chromium）
 npx playwright install chromium
 npm run test:ui
 ```
@@ -224,10 +227,19 @@ npm run test:ui
 | `APP_SECRET` | Token 签名密钥，生产必须修改 | 开发默认值 |
 | `DB_FILE` | SQLite 文件路径 | `data/app.db` |
 | `PUBLIC_BASE` | 对外访问基址（含协议和可选路径前缀），用于生成绝对嵌入代码；留空时按请求 Host / `X-Forwarded-*` 自动生成 | 请求 Host |
-| `GEO_API` | IP 归属地接口模板，`{ip}` 占位 | 本地确定性映射 |
+| `GEO_API` | IP 归属地接口模板，`{ip}` 占位；配置后优先使用，失败回退离线库 | 不启用 |
+| `GEO_FAMILIES` | ip2region 加载的地址族，逗号分隔，可选 `4`、`6` | `4,6` |
+| `GEO_DEBUG` | 设为 `1` 时输出 ip2region 加载失败日志 | 关闭 |
 | `SMS_WEBHOOK` | 注册短信发送 Webhook，POST `{phone, code, scene}` | 未配置时开发环境返回演示验证码 |
 | `SIGNUP_DEV_CODE` | 设为 `false` 时生产环境不返回验证码 | 开发环境返回 |
 | `PAYMENT_PROVIDER` | 支付渠道标识，开发默认 `mock` | `mock` |
+| `ALIPAY_APP_ID` | 支付宝应用 APPID | 未配置 |
+| `ALIPAY_PRIVATE_KEY` | 支付宝应用私钥，PKCS8/PKCS1 单行内容 | 未配置 |
+| `ALIPAY_PRIVATE_KEY_FILE` | 支付宝应用私钥 PEM 文件路径，和上一项二选一 | 未配置 |
+| `ALIPAY_PUBLIC_KEY` | 支付宝公钥，用于异步通知验签 | 未配置 |
+| `ALIPAY_GATEWAY` | 支付宝网关 | `https://openapi.alipay.com/gateway.do` |
+| `ALIPAY_NOTIFY_URL` | 支付宝异步通知地址 | 未配置 |
+| `ALIPAY_RETURN_URL` | 支付完成同步返回地址 | 未配置 |
 | `PAYMENT_WEBHOOK_SECRET` | 支付回调 HMAC 验签密钥，生产必须配置 | 回退 `APP_SECRET` |
 | `ALLOW_PLAN_SWITCH` | 生产环境设为 `1` 才开放演示套餐切换接口 | 仅开发环境 |
 
@@ -235,7 +247,7 @@ npm run test:ui
 
 当前实现是可直接运行的完整业务闭环，以下能力采用轻量实现，生产环境建议替换为外部服务：
 
-- IP 归属地：本地确定性映射，可通过 `GEO_API` 接入高德/腾讯位置服务
+- IP 归属地：内置 ip2region 离线库，支持 IPv4/IPv6 国家省市与运营商；可通过 `GEO_API` 覆盖为高德/腾讯等第三方接口
 - AI 应答与摘要：基于知识库相似度与规则模板，可替换为大模型调用
 - 多语言翻译：内置短语词典，可替换为翻译 API
 - 自定义域名：已完成配置与白标展示，生产环境需在网关/DNS 侧绑定证书与路由

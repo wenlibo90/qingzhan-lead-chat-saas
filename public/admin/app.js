@@ -131,7 +131,7 @@
     return String(s).slice(0, 10);
   };
   A.sourceLabel = function (s) {
-    return ({ form: '表单', chat: '聊天', offline: '离线留言', landing: '落地页', api: 'API', manual: '手动录入', direct: '直接访问', baidu: '百度', google: '谷歌', wechat: '微信', wechat_mp: '公众号', zhihu: '知乎', douyin: '抖音', bing: '必应', sogou: '搜狗', '360': '360', xiaohongshu: '小红书', weibo: '微博', referral: '外链', localhost: '本地' })[s] || s || '-';
+    return ({ form: '表单', chat: '聊天', offline: '离线留言', landing: '落地页', api: 'API', manual: '手动录入', direct: '直接访问', baidu: '百度', google: '谷歌', wechat: '微信', wechat_mp: '公众号', zhihu: '知乎', douyin: '抖音', bing: '必应', sogou: '搜狗', '360': '360', xiaohongshu: '小红书', weibo: '微博', referral: '外链', local: '本地', localhost: '本地', '127.0.0.1': '本地', '::1': '本地' })[s] || s || '-';
   };
   A.clip = function (s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n) + '…' : s; };
 
@@ -299,6 +299,7 @@
       title: '工作台', items: [
         { key: 'onboarding', label: '接入向导', icon: 'target', roles: ['admin', 'operator', 'agent'] },
         { key: 'dashboard', label: '数据概览', icon: 'dashboard', feature: 'basic_stats', roles: ['admin', 'operator', 'agent'] },
+        { key: 'analytics', label: '网站分析', icon: 'chart', feature: 'source_stats', roles: ['admin', 'operator'] },
         { key: 'conversations', label: '会话接待', icon: 'chat', feature: 'chat', roles: ['admin', 'operator', 'agent'], badge: 'chat' },
         { key: 'visitors', label: '访客档案', icon: 'users', feature: 'visitor_profile_basic', roles: ['admin', 'operator', 'agent'] },
         { key: 'leads', label: '线索 CRM', icon: 'leads', feature: 'crm', roles: ['admin', 'operator', 'agent'] }
@@ -473,7 +474,7 @@
                 '<div class="signup-hint" data-code-hint></div></div>' +
               '<div class="au-form-group"><label class="au-label">' + A.t('验证码') + '</label><input class="au-input" name="code" type="text" maxlength="6" placeholder="' + A.t('6 位短信验证码') + '" inputmode="numeric" autocomplete="one-time-code"></div>' +
               '<div class="au-form-group"><label class="au-label">' + A.t('密码') + '</label><input class="au-input" name="password" type="password" minlength="6" placeholder="' + A.t('至少 6 位，用于登录后台') + '" autocomplete="new-password"></div>' +
-              '<div class="signup-agree"><label><input type="checkbox" name="agree" checked> <span>' + A.t('我已阅读并同意') + '</span> <a href="/privacy.html" target="_blank">' + A.t('隐私政策') + '</a> <span>' + A.t('与') + '</span> <a href="#" onclick="return false">' + A.t('服务条款') + '</a></label></div>' +
+              '<div class="signup-agree"><label><input type="checkbox" name="agree" checked> <span>' + A.t('我已阅读并同意') + '</span> <a href="/privacy.html" target="_blank">' + A.t('隐私政策') + '</a> <span>' + A.t('与') + '</span> <a href="/terms.html" target="_blank">' + A.t('服务条款') + '</a></label></div>' +
               '<div class="s-error" data-error></div>' +
               '<button class="au-btn au-btn--primary login-submit" type="submit" data-submit>' + A.t('注册并进入后台') + '</button>' +
             '</form>' +
@@ -500,7 +501,6 @@
         .then(function (data) {
           A.state.token = data.token;
           LS.set('qz_admin_token', data.token);
-          A.state.pendingDashboard = true;
           A.boot();
         })
         .catch(function (err) {
@@ -565,10 +565,6 @@
         window.addEventListener('hashchange', function () { A.route(); });
       }
       A.route();
-      if (A.state.pendingDashboard) {
-        A.state.pendingDashboard = false;
-        if (location.hash !== '#/dashboard') location.hash = '#/dashboard'; else A.route();
-      }
       A.pollNotifications();
     }).catch(function (err) {
       boot.hidden = true;

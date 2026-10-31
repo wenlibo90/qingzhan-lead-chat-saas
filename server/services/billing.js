@@ -3,12 +3,15 @@ const crypto = require('node:crypto');
 const { get, run, all, tx } = require('../db');
 const { planOf } = require('../plans');
 const referral = require('./referral');
+const payments = require('./payments');
 
 const RANK = { free: 0, standard: 1, pro: 2, enterprise: 3 };
 const SECRET = process.env.PAYMENT_WEBHOOK_SECRET || process.env.APP_SECRET || 'qingzhan-leadchat-dev-secret-2026';
 
-function provider() { return process.env.PAYMENT_PROVIDER || 'mock'; }
-function mockEnabled() { return provider() === 'mock' && process.env.NODE_ENV !== 'production'; }
+function provider() { return payments.provider(); }
+function mockEnabled() { return payments.mockEnabled(); }
+function paymentInfo() { return payments.info(); }
+function paymentIntent(order) { return payments.createIntent(order); }
 function nowIso() { return new Date().toISOString().slice(0, 19).replace('T', ' '); }
 function addPeriod(base, cycle) {
   const d = base ? new Date(String(base).replace(' ', 'T') + 'Z') : new Date();
@@ -59,12 +62,16 @@ function createOrder({ tenantId, planCode, cycle = 'monthly', userId = null }) {
     [orderNo(), tenant.id, plan.code, cycle, amount, 'pending', provider(), `${tenant.id}:${plan.code}:${cycle}:${Date.now()}`, userId]
   ).lastInsertRowid;
   const order = get('SELECT * FROM orders WHERE id = ?', [id]);
-  return {
-    order: orderPublic(order),
-    payment: mockEnabled()
-      ? { mock: true, mode: 'mock', enabled: true, message: '开发环境可直接模拟支付完成订单' }
-      : { mock: false, mode: 'external', enabled: false, message: '支付通道已预留，请配置微信/支付宝适配器与 PAYMENT_WEBHOOK_SECRET' }
-  };
+  const payment = paymentInfo();
+  if (payment.provider === 'alipay' && payment.enabled) {
+    try {
+      payment.payUrl = paymentIntent(order).payUrl;
+    } catch (err) {
+      payment.enabled = false;
+      payment.message = err.message;
+    }
+  }
+  return { order: orderPublic(order), payment };
 }
 
 function applyPaidOrder(orderId, { providerTradeNo = null } = {}, inTransaction = false) {
@@ -172,6 +179,6 @@ function contactSales(tenantId, userId, message) {
 }
 
 module.exports = {
-  provider, mockEnabled, amountCents, createOrder, applyPaidOrder, markOrderFailed, cancelOrder,
+  provider, mockEnabled, paymentInfo, paymentIntent, amountCents, createOrder, applyPaidOrder, markOrderFailed, cancelOrder,
   scheduleDowngrade, resumeSubscription, listOrders, listInvoices, subscriptionOf, verifyWebhook, processWebhook, contactSales, orderPublic
 };

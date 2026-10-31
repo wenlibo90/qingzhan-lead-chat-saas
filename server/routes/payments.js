@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const billing = require('../services/billing');
+const payments = require('../services/payments');
 const router = express.Router();
 
 router.post('/webhook/:provider', (req, res) => {
@@ -24,6 +25,30 @@ router.post('/webhook/:provider', (req, res) => {
   } catch (e) {
     res.status(e.status || 400).json({ error: e.message });
   }
+});
+
+router.post('/alipay/notify', (req, res) => {
+  const params = req.body || {};
+  const check = payments.validateNotify('alipay', params);
+  if (!check.ok) {
+    console.warn('[alipay] notify rejected:', check.reason);
+    return res.status(400).type('text/plain').send('failure');
+  }
+  const data = payments.normalizeNotify('alipay', params);
+  if (!['TRADE_SUCCESS', 'TRADE_FINISHED'].includes(data.status)) {
+    return res.type('text/plain').send('success');
+  }
+  try {
+    billing.processWebhook(data);
+    res.type('text/plain').send('success');
+  } catch (e) {
+    console.error('[alipay] notify process failed:', e.message);
+    res.status(500).type('text/plain').send('failure');
+  }
+});
+
+router.get('/alipay/return', (req, res) => {
+  res.redirect(302, '/admin/?payment=alipay#/billing');
 });
 
 module.exports = router;

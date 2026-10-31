@@ -141,11 +141,7 @@ router.get('/billing', (req, res) => {
     subscription: billing.subscriptionOf(req.tenant),
     orders: billing.listOrders(req.tenant.id),
     invoices: billing.listInvoices(req.tenant.id),
-    payment: {
-      provider: billing.provider(),
-      mock: billing.mockEnabled(),
-      message: billing.mockEnabled() ? '开发环境支持模拟支付；生产环境需配置真实支付适配器。' : '支付通道待配置，可先联系销售开通。'
-    }
+    payment: billing.paymentInfo()
   });
 });
 
@@ -169,6 +165,19 @@ router.post('/billing/orders/:id/pay', requireRole('admin'), (req, res) => {
     const result = billing.applyPaidOrder(order.id, { providerTradeNo: 'MOCK-' + Date.now() });
     audit(req, 'billing.pay', `order:${order.order_no}`, '模拟支付成功');
     res.json({ ok: true, plan: planOf(result.tenant.plan), subscription: billing.subscriptionOf(result.tenant) });
+  } catch (e) {
+    res.status(e.status || 400).json({ error: e.message });
+  }
+});
+
+router.post('/billing/orders/:id/pay-intent', requireRole('admin'), (req, res) => {
+  const order = get('SELECT * FROM orders WHERE id = ? AND tenant_id = ?', [Number(req.params.id), req.tenant.id]);
+  if (!order) return res.status(404).json({ error: '订单不存在' });
+  if (order.status !== 'pending') return res.status(400).json({ error: '订单状态不可支付' });
+  try {
+    const intent = billing.paymentIntent(order);
+    audit(req, 'billing.pay_intent', `order:${order.order_no}`, `${intent.provider} / ${intent.mode}`);
+    res.json({ ok: true, ...intent });
   } catch (e) {
     res.status(e.status || 400).json({ error: e.message });
   }

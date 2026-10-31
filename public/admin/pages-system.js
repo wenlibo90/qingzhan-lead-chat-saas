@@ -12,8 +12,10 @@
     render: function (root) {
       root.innerHTML = '<div class="page-head"><div><h1>团队与权限</h1><p>客服只能接待对话；运营可配置站点与报表；管理员拥有全部权限。</p></div><div class="head-actions"><button class="au-btn au-btn--primary au-btn--sm" data-add-user>' + A.icon('plus', 14) + ' 添加子账号</button></div></div><div id="team-body">' + A.skeleton(3) + '</div>';
       root.querySelector('[data-add-user]').onclick = function () { openAddUser(root); };
+      var teamBox = root.querySelector('#team-body');
       A.api('/api/users').then(function (d) {
-        var box = root.querySelector('#team-body');
+        if (!teamBox || !root.contains(teamBox)) return;
+        var box = teamBox;
         box.innerHTML = '<div class="grid g3 mb-2">' +
           '<div class="metric-card"><div class="m-top"><span class="m-label">团队账号</span><span class="m-ico">' + A.icon('users', 14) + '</span></div><div class="m-value">' + d.users.filter(function (u) { return u.status === 'active'; }).length + '<small> / ' + (d.limit === -1 ? '不限' : d.limit) + '</small></div><div class="m-sub">当前套餐坐席</div></div>' +
           '<div class="metric-card"><div class="m-top"><span class="m-label">客服</span><span class="m-ico green">' + A.icon('chat', 14) + '</span></div><div class="m-value">' + d.users.filter(function (u) { return u.role === 'agent'; }).length + '</div><div class="m-sub">专注接待与线索跟进</div></div>' +
@@ -36,7 +38,7 @@
             A.apiPatch('/api/users/' + u.id, { status: u.status === 'active' ? 'disabled' : 'active' }).then(function () { A.toast('状态已更新', 'ok'); A.route(); }).catch(A.handleError);
           };
         });
-      }).catch(function (e) { A.handleError(e); root.querySelector('#team-body').innerHTML = A.empty('加载失败', e.message); });
+      }).catch(function (e) { if (!teamBox || !root.contains(teamBox)) return; A.handleError(e); teamBox.innerHTML = A.empty('加载失败', e.message); });
     }
   });
 
@@ -205,24 +207,37 @@
   function openPayment(order, d, payment) {
     if (!order) return;
     var pay = payment || (d && d.payment) || { mock: false, message: '支付通道未配置' };
+    var alipayReady = pay.provider === 'alipay' && pay.enabled;
+    var noticeClass = pay.mock || alipayReady ? 'info' : 'warn';
+    var actionLabel = pay.mock ? '模拟支付完成' : alipayReady ? '前往支付宝支付' : '联系销售';
     var m = A.modal({
       title: '支付订单',
       subtitle: '订单号 ' + order.order_no,
       body: '<div class="order-summary"><div class="side-kv"><span>套餐</span><b>' + A.planName(order.plan) + '</b></div><div class="side-kv"><span>周期</span><b>' + (order.cycle === 'yearly' ? '年付' : '月付') + '</b></div><div class="side-kv total"><span>应付</span><b>¥' + order.amount + '</b></div></div>' +
-        '<div class="notice ' + (pay.mock ? 'info' : 'warn') + ' mt-2">' + A.icon('card', 14) + '<span>' + A.esc(pay.message || (pay.mock ? '开发环境可模拟支付。' : '请配置支付渠道后使用。')) + '</span></div>' +
+        '<div class="notice ' + noticeClass + ' mt-2">' + A.icon('card', 14) + '<span>' + A.esc(pay.message || (pay.mock ? '开发环境可模拟支付。' : '请配置支付渠道后使用。')) + '</span></div>' +
         (order.status === 'paid' ? '<div class="notice ok mt-2">该订单已支付。</div>' : ''),
       footer: order.status === 'paid' ? [{ label: '关闭', class: 'au-btn--ghost' }] : [
         { label: '稍后支付', class: 'au-btn--ghost', onClick: function (card, close) { close(); A.route(); } },
-        { label: pay.mock ? '模拟支付完成' : '联系销售', class: 'au-btn--primary', onClick: function (card, close) {
-          if (!pay.mock) {
+        { label: actionLabel, class: 'au-btn--primary', onClick: function (card, close) {
+          if (pay.mock) {
+            A.apiPost('/api/billing/orders/' + order.id + '/pay', {}).then(function () {
+              close();
+              A.toast('支付成功，套餐已生效', 'ok');
+              A.boot();
+            }).catch(A.handleError);
+            return;
+          }
+          if (!alipayReady) {
             A.apiPost('/api/billing/contact-sales', { message: '客户需要协助完成支付。' }).then(function () { close(); A.toast('已转给销售', 'ok'); }).catch(A.handleError);
             return;
           }
-          A.apiPost('/api/billing/orders/' + order.id + '/pay', {}).then(function () {
+          var go = function (url) {
+            if (!url) return A.toast('支付宝下单失败，请稍后重试', 'err');
             close();
-            A.toast('支付成功，套餐已生效', 'ok');
-            A.boot();
-          }).catch(A.handleError);
+            window.location.href = url;
+          };
+          if (pay.payUrl) return go(pay.payUrl);
+          A.apiPost('/api/billing/orders/' + order.id + '/pay-intent', {}).then(function (r) { go(r.payUrl); }).catch(A.handleError);
         } }
       ]
     });

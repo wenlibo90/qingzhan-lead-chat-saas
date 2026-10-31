@@ -323,6 +323,7 @@
       root.querySelector('[data-new-site]').onclick = openCreateSite;
       var grid = root.querySelector('#sites-grid');
       A.api('/api/sites').then(function (d) {
+        if (!grid || !root.contains(grid)) return;
         if (!d.sites.length) { grid.innerHTML = '<div class="az-card pad">' + A.empty('还没有站点', '添加站点后会生成一段独立 JS 代码') + '</div>'; return; }
         grid.innerHTML = d.sites.map(function (s) {
           return '<div class="az-card"><div class="az-card-head"><div class="flex items-center gap-1"><span class="avatar-sm">' + A.icon('globe', 14) + '</span><div><h3>' + A.esc(s.name) + '</h3><div class="sub">' + A.esc(s.domain || '未绑定域名') + '</div></div></div>' +

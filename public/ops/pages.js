@@ -7,7 +7,9 @@
     title: '运营概览', subtitle: '注册、激活、试用与销售线索',
     render: function (root) {
       root.innerHTML = '<div id="ov-body">' + skeleton(4) + '</div>';
+      var ovBox = root.querySelector('#ov-body');
       O.api('/api/ops/overview').then(function (d) {
+        if (!ovBox || !root.contains(ovBox)) return;
         var m = d.metrics;
         var maxAct = Math.max.apply(null, d.activation.map(function (a) { return a.value; }).concat([1]));
         var metrics = [
@@ -19,7 +21,7 @@
           ['风险/停用', m.risk, '需要人工查看', 'shield'],
           ['已收金额', '¥' + Number(m.revenue || 0).toLocaleString('zh-CN'), (m.paidOrders || 0) + ' 笔已支付订单', 'card']
         ];
-        root.querySelector('#ov-body').innerHTML =
+        ovBox.innerHTML =
           '<div class="ops-metric-grid section-gap">' + metrics.map(function (x) {
             return '<div class="ops-metric"><span>' + x[0] + '</span><b>' + O.fmtNum(x[1]) + '</b><em class="' + (x[0].indexOf('风险') > -1 ? 'warn' : '') + '">' + x[2] + '</em></div>';
           }).join('') + '</div>' +
@@ -40,7 +42,7 @@
             return '<div class="bar-row"><span class="bar-label">' + O.planLabel(p.plan) + '</span><span class="bar-track"><span class="bar-fill" style="width:' + Math.min(100, p.c / Math.max(1, d.metrics.workspaces) * 100) + '%"></span></span><span class="bar-val">' + p.c + '</span></div>';
           }).join('') + '</div></div></div>';
         O.$$('[data-go]', root).forEach(function (b) { b.onclick = function () { O.go(b.getAttribute('data-go')); }; });
-      }).catch(function (e) { O.handle(e); root.querySelector('#ov-body').innerHTML = '<div class="ops-empty">' + O.esc(e.message) + '</div>'; });
+      }).catch(function (e) { if (!ovBox || !root.contains(ovBox)) return; O.handle(e); ovBox.innerHTML = '<div class="ops-empty">' + O.esc(e.message) + '</div>'; });
     }
   });
 
@@ -135,12 +137,13 @@
       var sites = d.sites.map(function (s) { return '<div class="ops-list-item"><span class="avatar-sm green">站</span><div style="flex:1"><b>' + O.esc(s.name) + '</b><span>' + O.esc(s.domain || s.site_key) + '</span></div><div class="right">' + (s.installed_at ? '<span class="pill green">已安装</span>' : '<span class="pill gray">未安装</span>') + '</div></div>'; }).join('');
       var body = '<div class="ops-detail-grid"><div class="ops-detail-card"><h4>工作空间</h4><b>' + O.esc(t.name) + '</b><p>#' + t.id + '<br>来源：' + O.esc(t.signup_source || '-') + '<br>注册 IP：' + O.esc(t.signup_ip || '-') + '<br>创建时间：' + O.fmtTime(t.created_at) + '</p></div>' +
         '<div class="ops-detail-card"><h4>套餐与试用</h4><b>' + O.planLabel(t.plan) + ' · ' + O.planStatusLabel(t.plan_status) + '</b><p>试用到期：' + O.fmtTime(t.trial_ends_at) + '<br>风险分：' + t.risk_score + ' · 状态：' + O.statusPill(t.status) + '</p></div></div>' +
-        '<div class="flex gap-1 mt-2 wrap"><select class="az-select" data-plan style="width:120px">' + ['free', 'standard', 'pro', 'enterprise'].map(function (p) { return '<option value="' + p + '"' + (t.plan === p ? ' selected' : '') + '>' + O.planLabel(p) + '</option>'; }).join('') + '</select><button class="au-btn au-btn--ghost au-btn--xs" data-save-plan>保存套餐</button><button class="au-btn au-btn--ghost au-btn--xs" data-extend>延长试用 7 天</button><button class="au-btn au-btn--' + (t.status === 'active' ? 'danger' : 'success') + ' au-btn--xs" data-toggle-ws>' + (t.status === 'active' ? '停用工作空间' : '恢复工作空间') + '</button></div>' +
+        '<div class="flex gap-1 mt-2 wrap"><select class="az-select" data-plan style="width:120px">' + ['free', 'standard', 'pro', 'enterprise'].map(function (p) { return '<option value="' + p + '"' + (t.plan === p ? ' selected' : '') + '>' + O.planLabel(p) + '</option>'; }).join('') + '</select><select class="az-select" data-pstatus style="width:110px">' + ['active', 'trialing', 'past_due', 'expired', 'canceled'].map(function (ps) { return '<option value="' + ps + '"' + (t.plan_status === ps ? ' selected' : '') + '>' + O.planStatusLabel(ps) + '</option>'; }).join('') + '</select><button class="au-btn au-btn--ghost au-btn--xs" data-save-plan>保存套餐与状态</button><button class="au-btn au-btn--ghost au-btn--xs" data-extend>延长试用 7 天</button><button class="au-btn au-btn--' + (t.status === 'active' ? 'danger' : 'success') + ' au-btn--xs" data-toggle-ws>' + (t.status === 'active' ? '停用工作空间' : '恢复工作空间') + '</button></div>' +
+        '<div class="tiny muted mt-1">客户线下付款后，将状态改为「正常」即可开通对应套餐；试用客户保持「试用中」。</div>' +
         '<div class="divider"></div><div class="grid g2"><div><h4 style="font-size:12px;margin:0 0 7px">成员</h4>' + (members || '<div class="ops-empty">暂无成员</div>') + '</div><div><h4 style="font-size:12px;margin:0 0 7px">站点</h4>' + (sites || '<div class="ops-empty">暂无站点</div>') + '</div></div>' +
         '<div class="divider"></div><h4 style="font-size:12px;margin:0 0 7px">关联申请</h4>' + (d.applications.length ? d.applications.map(function (a) { return '<div class="ops-list-item"><span class="avatar-sm gray">申</span><div style="flex:1"><b>' + O.esc(a.name) + ' · ' + O.esc(a.company || '') + '</b><span>' + O.esc(a.phone || '') + '</span></div><div class="right">' + O.statusPill(a.status) + '</div></div>'; }).join('') : '<div class="ops-empty">无关联申请</div>');
       var m = O.modal({ title: '工作空间详情', size: 'wide', body: body, footer: [{ label: '关闭', class: 'au-btn--ghost' }] });
       m.el.querySelector('[data-save-plan]').onclick = function () {
-        O.api('/api/ops/workspaces/' + t.id, { method: 'PATCH', body: { plan: m.el.querySelector('[data-plan]').value } }).then(function () { m.close(); O.toast('套餐已更新', 'ok'); loadWs(root); }).catch(O.handle);
+        O.api('/api/ops/workspaces/' + t.id, { method: 'PATCH', body: { plan: m.el.querySelector('[data-plan]').value, plan_status: m.el.querySelector('[data-pstatus]').value } }).then(function () { m.close(); O.toast('套餐与订阅状态已更新', 'ok'); loadWs(root); }).catch(O.handle);
       };
       m.el.querySelector('[data-extend]').onclick = function () {
         var base = t.trial_ends_at ? new Date(String(t.trial_ends_at).replace(' ', 'T') + 'Z').getTime() : Date.now();
@@ -170,13 +173,17 @@
   });
   function loadApps(root) {
     var st = O._apps;
+    var sel = root.querySelector('[data-status]');
+    var statsBox = root.querySelector('#app-stats');
+    var totalBox = root.querySelector('[data-total]');
+    var body = root.querySelector('#app-body');
+    if (!sel || !statsBox || !totalBox || !body) return;
     O.api('/api/ops/applications?page=' + st.page + '&limit=20' + (st.q ? '&q=' + encodeURIComponent(st.q) : '') + (st.status ? '&status=' + st.status : '')).then(function (d) {
-      var sel = root.querySelector('[data-status]');
+      if (!root.contains(body)) return;
       sel.innerHTML = '<option value="">全部状态</option>' + d.statuses.map(function (s) { return '<option value="' + s + '"' + (st.status === s ? ' selected' : '') + '>' + d.labels[s] + '</option>'; }).join('');
-      root.querySelector('#app-stats').innerHTML = [['all', '全部'], ['new', '新申请'], ['contacted', '已联系'], ['qualified', '已确认'], ['won', '已成交']].map(function (x) { return '<button class="au-chip ' + (st.status === (x[0] === 'all' ? '' : x[0]) ? 'active' : '') + '" data-stat="' + (x[0] === 'all' ? '' : x[0]) + '">' + x[1] + ' <b>' + (d.stats[x[0]] || 0) + '</b></button>'; }).join('');
+      statsBox.innerHTML = [['all', '全部'], ['new', '新申请'], ['contacted', '已联系'], ['qualified', '已确认'], ['won', '已成交']].map(function (x) { return '<button class="au-chip ' + (st.status === (x[0] === 'all' ? '' : x[0]) ? 'active' : '') + '" data-stat="' + (x[0] === 'all' ? '' : x[0]) + '">' + x[1] + ' <b>' + (d.stats[x[0]] || 0) + '</b></button>'; }).join('');
       O.$$('[data-stat]', root).forEach(function (b) { b.onclick = function () { st.status = b.getAttribute('data-stat'); st.page = 1; loadApps(root); }; });
-      root.querySelector('[data-total]').textContent = '共 ' + d.total + ' 条';
-      var body = root.querySelector('#app-body');
+      totalBox.textContent = '共 ' + d.total + ' 条';
       body.innerHTML = '<div class="table-wrap"><table class="az-table"><thead><tr><th>申请</th><th>公司与需求</th><th>来源</th><th>状态</th><th>负责人</th><th>时间</th><th></th></tr></thead><tbody>' +
         (d.applications.length ? d.applications.map(function (a) {
           return '<tr><td><div class="u-name">' + O.esc(a.name) + '</div><div class="u-sub">' + O.esc(a.phone || a.email || '') + '</div></td>' +
@@ -225,11 +232,12 @@
   function convertApp(a, root) {
     var m = O.modal({
       title: '转为工作空间', subtitle: '会创建账号与工作空间，客户登录后添加自己的网站',
-      body: '<div class="grid"><div><label class="field-label">工作空间名称</label><input class="az-input" data-cv="name" value="' + O.esc(a.company || a.name + ' 的工作空间') + '"></div><div><label class="field-label">开通套餐</label><select class="az-select" data-cv="plan"><option value="pro">专业版 14 天试用</option><option value="standard">标准版 14 天试用</option><option value="free">免费版</option></select></div><div class="ops-callout">如果手机号已有账号，会直接增加一个工作空间成员关系；没有账号会创建账号并返回临时密码。</div></div>',
+      body: '<div class="grid"><div><label class="field-label">工作空间名称</label><input class="az-input" data-cv="name" value="' + O.esc(a.company || a.name + ' 的工作空间') + '"></div><div><label class="field-label">开通套餐</label><select class="az-select" data-cv="plan"><option value="pro">专业版</option><option value="standard">标准版</option><option value="free">免费版</option></select></div><div><label class="field-label">开通方式</label><select class="az-select" data-cv="status"><option value="trialing">14 天试用</option><option value="active">直接开通（已付费）</option></select></div><div class="ops-callout">如果手机号已有账号，会直接增加一个工作空间成员关系；没有账号会创建账号并返回临时密码。</div></div>',
       footer: [{ label: '取消', class: 'au-btn--ghost' }, { label: '开通工作空间', class: 'au-btn--primary', onClick: function (card, close) {
         var name = card.querySelector('[data-cv="name"]').value.trim();
         var plan = card.querySelector('[data-cv="plan"]').value;
-        O.api('/api/ops/applications/' + a.id + '/convert', { body: { workspaceName: name, plan: plan } }).then(function (r) {
+        var planStatus = card.querySelector('[data-cv="status"]').value;
+        O.api('/api/ops/applications/' + a.id + '/convert', { body: { workspaceName: name, plan: plan, plan_status: planStatus } }).then(function (r) {
           close();
           O.modal({ title: '工作空间已开通', body: '<div class="notice ok">客户账号：' + O.esc(r.account.phone || r.account.email || '') + (r.temp_password ? '<br>临时密码：<b>' + O.esc(r.temp_password) + '</b>（仅显示一次，请转交客户）' : '<br>客户已有账号，直接登录即可。') + '</div><div class="side-kv mt-2"><span>工作空间</span><b>' + O.esc(r.tenant.name) + '</b></div><div class="side-kv"><span>下一步</span><b>客户登录后添加自己的网站</b></div>', footer: [{ label: '关闭', class: 'au-btn--ghost' }] });
           loadApps(root);

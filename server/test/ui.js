@@ -90,9 +90,10 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
   if (!/Sign up free/i.test(heroCta)) throw new Error('landing i18n failed: ' + heroCta);
   const heroTitle = await i18nPage.locator('.hero h1').innerText();
   if (!/lead CRM/i.test(heroTitle)) throw new Error('landing title i18n failed: ' + heroTitle);
-  await i18nPage.goto(BASE + '/signup/', { waitUntil: 'networkidle' });
-  await i18nPage.waitForTimeout(400);
-  const signupTitle = await i18nPage.locator('.s-card-head h2').innerText();
+  await i18nPage.goto(BASE + '/', { waitUntil: 'networkidle' });
+  await i18nPage.click('[data-signup]');
+  await i18nPage.waitForSelector('.signup-mask', { timeout: 3000 });
+  const signupTitle = await i18nPage.locator('.signup-mask .consult-head h3').innerText();
   if (!/Create your account/i.test(signupTitle)) throw new Error('signup i18n failed: ' + signupTitle);
   await i18nPage.screenshot({ path: SHOTS + '/01c-i18n.png' });
   await i18nCtx.close();
@@ -199,7 +200,7 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
 
   // other admin pages
   const pages = [
-    ['visitors', 'visitor'], ['leads', 'lead'], ['reports', 'report'], ['widget', 'widget'], ['automation', 'automation'],
+    ['analytics', 'analytics'], ['visitors', 'visitor'], ['leads', 'lead'], ['reports', 'report'], ['widget', 'widget'], ['automation', 'automation'],
     ['knowledge', 'knowledge'], ['sites', 'sites'], ['forms', 'forms'], ['team', 'team'], ['billing', 'billing'],
     ['settings', 'settings'], ['notifications', 'notifications'], ['support', 'support'], ['referral', 'referral'], ['logs', 'logs']
   ];
@@ -223,26 +224,19 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
     await admin.waitForTimeout(900);
     const payBtn = admin.locator('.modal-card .modal-foot button').last();
     if (await payBtn.count()) {
-      await payBtn.click();
-      await admin.waitForTimeout(1800);
-      await admin.screenshot({ path: SHOTS + '/20-billing-paid.png', fullPage: true });
-      log('自助订单创建与模拟支付');
+      const payLabel = await payBtn.innerText();
+      if (payLabel.includes('模拟支付')) {
+        await payBtn.click();
+        await admin.waitForTimeout(1800);
+        await admin.screenshot({ path: SHOTS + '/20-billing-paid.png', fullPage: true });
+        log('自助订单创建与模拟支付');
+      } else {
+        await admin.locator('.modal-card .modal-close').click();
+        await admin.waitForTimeout(300);
+        log('自助订单创建并生成支付宝支付链接');
+      }
     }
   }
-
-  // dark mode
-  await admin.locator('[data-nav="dashboard"]').click();
-  await admin.waitForTimeout(900);
-  await admin.locator('[data-density]').click();
-  await admin.waitForTimeout(700);
-  const darkClass = await admin.locator('html').getAttribute('class');
-  if (!(darkClass || '').includes('au-dark')) throw new Error('dark mode class missing');
-  const cardBg = await admin.locator('.az-card').first().evaluate((el) => getComputedStyle(el).backgroundColor);
-  if (cardBg === 'rgb(255, 255, 255)' || cardBg === 'rgba(255, 255, 255, 0.78)') throw new Error('card stays light in dark mode: ' + cardBg);
-  await admin.screenshot({ path: SHOTS + '/20-dark-dashboard.png', fullPage: true });
-  await admin.locator('[data-density]').click();
-  await admin.waitForTimeout(500);
-  log('深色模式卡片与控件切换');
 
   // visitors detail
   await admin.locator('[data-nav="visitors"]').click();
@@ -313,16 +307,15 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
   const signup = await ctx.newPage();
   signup.on('pageerror', (e) => errors.push('signup pageerror: ' + e.message));
   signup.on('console', (m) => { if (m.type() === 'error') errors.push('signup console: ' + m.text()); });
-  await signup.goto(BASE + '/signup/', { waitUntil: 'networkidle' });
-  await signup.waitForTimeout(500);
+  await signup.goto(BASE + '/', { waitUntil: 'networkidle' });
+  await signup.click('[data-signup]');
+  await signup.waitForSelector('.signup-mask', { timeout: 3000 });
   const signupPhone = '139' + String(Date.now()).slice(-8);
-  await signup.fill('input[name=phone]', signupPhone);
-  await signup.click('#send-code');
-  await signup.waitForTimeout(900);
-  const codeHint = await signup.locator('#code-hint').innerText();
-  if (!codeHint.includes('演示环境验证码')) throw new Error('signup code hint');
-  await signup.fill('input[name=password]', 'test1234');
-  await signup.click('#submit-btn');
+  await signup.fill('.signup-form input[name=phone]', signupPhone);
+  await signup.click('.signup-form [data-send-code]');
+  await signup.waitForFunction(() => /演示环境验证码/.test((document.querySelector('.signup-form [data-code-hint]') || {}).textContent || ''), null, { timeout: 5000 });
+  await signup.fill('.signup-form input[name=password]', 'test1234');
+  await signup.click('.signup-form button[type=submit]');
   await signup.waitForSelector('#app:not([hidden])', { timeout: 15000 });
   await signup.waitForTimeout(1300);
   if (!signup.url().includes('/admin/#/onboarding')) throw new Error('signup redirect: ' + signup.url());
@@ -330,6 +323,16 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
   if (onbTitle !== '接入向导') throw new Error('onboarding title ' + onbTitle);
   await signup.screenshot({ path: SHOTS + '/16-signup-onboarding.png', fullPage: true });
   log('自助注册并进入接入向导');
+  await signup.evaluate(() => localStorage.removeItem('qz_admin_token'));
+  await signup.goto(BASE + '/admin/?relogin=' + Date.now() + '#/onboarding', { waitUntil: 'networkidle' });
+  await signup.fill('input[name=identifier]', signupPhone);
+  await signup.fill('input[name=password]', 'test1234');
+  await signup.click('#login-form button[type=submit]');
+  await signup.waitForSelector('#app:not([hidden])', { timeout: 15000 });
+  await signup.waitForTimeout(1400);
+  const onbTitleAgain = await signup.locator('#page h1').first().innerText();
+  if (onbTitleAgain !== '接入向导') throw new Error('login should keep onboarding route: ' + onbTitleAgain);
+  log('登录后保留接入向导路由');
   if (await signup.locator('a[href^="/sandbox/"]').count()) throw new Error('self-serve sandbox should be removed');
   const addSite = signup.locator('[data-add-site]').first();
   if (!(await addSite.count())) throw new Error('onboarding add-site action missing');

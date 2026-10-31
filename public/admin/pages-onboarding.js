@@ -14,6 +14,8 @@
   });
 
   function load(root) {
+    var box = root.querySelector('#onboarding-body');
+    if (!box) return;
     A.api('/api/onboarding/status').then(function (d) {
       var site = d.production_site;
       var trialLeft = A.trialDaysLeft();
@@ -31,7 +33,8 @@
       var codeBlock = site
         ? '<div class="code-box">' + A.esc(embed) + '</div><div class="flex gap-1 mt-2"><button class="au-btn au-btn--primary au-btn--sm" data-copy>复制代码</button><a class="au-btn au-btn--ghost au-btn--sm" href="#/sites">网站接入设置</a></div>'
         : '<div class="empty-state" style="padding:26px 16px"><div class="em-ico">' + A.icon('globe', 20) + '</div><b>先添加你的网站</b><p>添加后系统会生成加载令牌和一段 JS。把代码放到你的网站，就能开始接收真实咨询。</p><button class="au-btn au-btn--primary au-btn--sm mt-2" data-add-site>添加网站</button></div>';
-      root.querySelector('#onboarding-body').innerHTML =
+      if (!root.contains(box)) return;
+      box.innerHTML =
         '<div class="onboard-hero">' +
           '<div class="oh-left"><span class="kicker">SELF-SERVE ONBOARDING</span><h2>你好，' + A.esc(A.state.user.name) + '</h2><p>你的工作空间「' + A.esc(A.state.tenant.name) + '」已经开通。自助客户直接在自己的网站上跑真实场景，不需要额外演示站。</p>' +
           '<div class="oh-actions">' + action + '<a class="au-btn au-btn--ghost" href="#/sites">' + A.icon('grid', 14) + ' 站点管理</a></div>' +
@@ -57,8 +60,9 @@
       A.$$('[data-copy]', root).forEach(function (b) { b.addEventListener('click', function () { if (embed) A.copy(embed); }); });
       A.$$('[data-add-site]', root).forEach(function (b) { b.addEventListener('click', function () { A.go('sites'); }); });
     }).catch(function (e) {
+      if (!root.contains(box)) return;
       A.handleError(e);
-      root.querySelector('#onboarding-body').innerHTML = A.empty('加载失败', e.message);
+      box.innerHTML = A.empty('加载失败', e.message);
     });
   }
 })();

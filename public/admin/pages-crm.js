@@ -85,9 +85,11 @@
   function renderVisitorDetail(root, id) {
     root.innerHTML = '<div class="page-head"><div><h1>访客档案</h1><p>加载中...</p></div><div class="head-actions"><button class="au-btn au-btn--ghost au-btn--sm" data-back>' + A.icon('back', 14) + ' 返回列表</button></div></div><div id="vd-body">' + A.skeleton(5) + '</div>';
     root.querySelector('[data-back]').addEventListener('click', function () { A.go('visitors'); });
-    A.api('/api/visitors/' + id).then(function (d) { renderDetailBody(root, d); }).catch(function (e) {
+    var vdBox = root.querySelector('#vd-body');
+    A.api('/api/visitors/' + id).then(function (d) { if (vdBox && root.contains(vdBox)) renderDetailBody(root, d); }).catch(function (e) {
+      if (!vdBox || !root.contains(vdBox)) return;
       A.handleError(e);
-      root.querySelector('#vd-body').innerHTML = A.empty('无法查看档案', e.message);
+      vdBox.innerHTML = A.empty('无法查看档案', e.message);
     });
   }
 
@@ -332,6 +334,7 @@
     A.api('/api/leads/' + id).then(function (d) {
       var l = d.lead;
       var body = root.querySelector('#ld-body');
+      if (!body) return;
       body.innerHTML = '<div class="grid g-2-1">' +
         '<div class="grid" style="gap:16px">' +
         '<div class="az-card pad"><div class="flex items-center gap-2"><span class="avatar-sm purple" style="width:44px;height:44px;font-size:15px">' + A.esc((l.name || '线').slice(0, 1)) + '</span><div style="flex:1"><b style="font-size:17px">' + A.esc(l.name || '匿名线索') + '</b><div class="tiny muted">' + A.esc(l.phone || '') + (l.company ? ' · ' + A.esc(l.company) : '') + '</div></div>' + A.statusPill(l.status) + '<span class="pill ' + (l.score >= 60 ? 'red' : 'orange') + '">' + Math.round(l.score) + ' 分</span></div>' +
@@ -378,6 +381,6 @@
         if (!input.value.trim()) return A.toast('请输入跟进内容', 'err');
         A.apiPost('/api/leads/' + l.id + '/followups', { content: input.value.trim() }).then(function () { A.toast('跟进已记录', 'ok'); A.refresh(); }).catch(A.handleError);
       };
-    }).catch(function (e) { A.handleError(e); root.querySelector('#ld-body').innerHTML = A.empty('加载失败', e.message); });
+    }).catch(function (e) { var ld = root.querySelector('#ld-body'); if (!ld) return; A.handleError(e); ld.innerHTML = A.empty('加载失败', e.message); });
   }
 })();

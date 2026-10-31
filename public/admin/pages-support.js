@@ -18,15 +18,19 @@
   });
 
   function load(root) {
+    var statsBox = root.querySelector('#ticket-stats');
+    var listBox = root.querySelector('#ticket-list');
+    if (!statsBox || !listBox) return;
     A.api('/api/support/tickets' + (state.status ? '?status=' + state.status : '')).then(function (d) {
+      if (!root.contains(statsBox) || !root.contains(listBox)) return;
       state.tickets = d.tickets; state.stats = d.stats;
-      var stats = root.querySelector('#ticket-stats');
+      var stats = statsBox;
       stats.innerHTML = [['', '全部'], ['open', '待回复'], ['pending', '已回复'], ['resolved', '已解决'], ['closed', '已关闭']].map(function (x) {
         var count = x[0] ? (d.stats[x[0]] || 0) : (d.stats.open + d.stats.pending + d.stats.resolved + d.stats.closed);
         return '<button class="au-chip ' + (state.status === x[0] ? 'active' : '') + '" data-tstat="' + x[0] + '">' + x[1] + ' <b>' + count + '</b></button>';
       }).join('');
       A.$$('[data-tstat]', root).forEach(function (b) { b.onclick = function () { state.status = b.getAttribute('data-tstat'); load(root); }; });
-      var list = root.querySelector('#ticket-list');
+      var list = listBox;
       list.innerHTML = d.tickets.length ? d.tickets.map(function (t) {
         var st = STATUS[t.status] || t.status;
         var cls = t.status === 'open' ? 'orange' : t.status === 'pending' ? 'blue' : t.status === 'resolved' ? 'green' : 'gray';

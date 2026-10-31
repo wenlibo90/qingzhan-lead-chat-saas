@@ -1,4 +1,5 @@
 'use strict';
+require('./env');
 const path = require('node:path');
 const http = require('node:http');
 const fs = require('node:fs');
@@ -11,6 +12,7 @@ const conversationRoutes = require('./routes/conversations');
 const visitorRoutes = require('./routes/visitors');
 const leadRoutes = require('./routes/leads');
 const reportRoutes = require('./routes/reports');
+const analyticsRoutes = require('./routes/analytics');
 const configRoutes = require('./routes/config');
 const settingsRoutes = require('./routes/settings');
 const externalRoutes = require('./routes/external');
@@ -91,7 +93,14 @@ app.get('/qz-core.js', (req, res) => {
 });
 
 app.use('/api/public', (req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Vary', 'Origin');
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Access-Control-Max-Age', '86400');
@@ -112,6 +121,7 @@ app.use('/api/v1', externalRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/visitors', visitorRoutes);
 app.use('/api/leads', leadRoutes);
+app.use('/api/analytics', analyticsRoutes);
 app.use('/api', reportRoutes);
 app.use('/api', configRoutes);
 app.use('/api', settingsRoutes);
@@ -126,6 +136,10 @@ app.get('/r/:code', (req, res) => {
   res.redirect(302, '/?signup=1&ref=' + encodeURIComponent(code));
 });
 app.get(['/promote', '/promote/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'promote.html')));
+app.get(['/signup', '/signup/'], (req, res) => {
+  const ref = String(req.query.ref || '').trim();
+  res.redirect(302, '/?signup=1' + (ref ? '&ref=' + encodeURIComponent(ref) : ''));
+});
 app.get(['/admin', '/admin/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin', 'index.html')));
 app.get(['/ops', '/ops/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'ops', 'index.html')));
 app.use('/admin', express.static(path.join(PUBLIC_DIR, 'admin'), { index: 'index.html', maxAge: 0 }));

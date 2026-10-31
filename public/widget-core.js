@@ -168,6 +168,7 @@
       sendPageview();
     }).catch(function () { trackingOn = false; });
     bindTracking();
+    startVitals();
     startRuleEngine();
   }
 
@@ -201,6 +202,85 @@
     api('/api/public/track', {
       body: Object.assign(basePayload(), { type: type || 'event', name: name, payload: payload || {} })
     }).catch(function () { });
+  }
+  function beaconEvent(name, payload, type) {
+    if (!trackingOn) return;
+    var body = Object.assign(basePayload(), { type: type || 'event', name: name, payload: payload || {} });
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(BASE + '/api/public/track', new Blob([JSON.stringify(body)], { type: 'application/json' }));
+        return;
+      }
+    } catch (e) { }
+    trackEvent(name, payload, type);
+  }
+
+  var vitalsStarted = false;
+  function startVitals() {
+    if (vitalsStarted || !window.PerformanceObserver) return;
+    vitalsStarted = true;
+    var lcp = 0, cls = 0, inp = 0;
+    function rating(metric, value) {
+      if (metric === 'LCP') return value <= 2500 ? 'good' : value <= 4000 ? 'needs-improvement' : 'poor';
+      if (metric === 'CLS') return value <= 0.1 ? 'good' : value <= 0.25 ? 'needs-improvement' : 'poor';
+      if (metric === 'INP') return value <= 200 ? 'good' : value <= 500 ? 'needs-improvement' : 'poor';
+      if (metric === 'TTFB') return value <= 800 ? 'good' : value <= 1800 ? 'needs-improvement' : 'poor';
+      if (metric === 'FCP') return value <= 1800 ? 'good' : value <= 3000 ? 'needs-improvement' : 'poor';
+      return '';
+    }
+    function report(metric, value) {
+      if (!value && value !== 0) return;
+      beaconEvent('web_vital_' + metric.toLowerCase(), {
+        metric: metric,
+        value: Math.round(value * 1000) / 1000,
+        rating: rating(metric, value),
+        path: location.pathname
+      }, 'performance');
+    }
+    try {
+      new PerformanceObserver(function (list) {
+        var entries = list.getEntries();
+        var last = entries[entries.length - 1];
+        if (last) lcp = last.startTime;
+      }).observe({ type: 'largest-contentful-paint', buffered: true });
+    } catch (e) { }
+    try {
+      new PerformanceObserver(function (list) {
+        list.getEntries().forEach(function (entry) {
+          if (!entry.hadRecentInput) cls += entry.value;
+        });
+      }).observe({ type: 'layout-shift', buffered: true });
+    } catch (e) { }
+    try {
+      new PerformanceObserver(function (list) {
+        list.getEntries().forEach(function (entry) {
+          if (entry.interactionId && entry.duration > inp) inp = entry.duration;
+        });
+      }).observe({ type: 'event', buffered: true, durationThreshold: 40 });
+    } catch (e) { }
+    try {
+      new PerformanceObserver(function (list) {
+        list.getEntries().forEach(function (entry) {
+          if (entry.name === 'first-contentful-paint') report('FCP', entry.startTime);
+        });
+      }).observe({ type: 'paint', buffered: true });
+    } catch (e) { }
+    try {
+      var nav = performance.getEntriesByType('navigation')[0];
+      if (nav) report('TTFB', nav.responseStart);
+    } catch (e) { }
+    var vitalsFlushed = false;
+    function flushVitals() {
+      if (vitalsFlushed) return;
+      vitalsFlushed = true;
+      if (lcp) report('LCP', lcp);
+      report('CLS', cls);
+      if (inp) report('INP', inp);
+    }
+    window.addEventListener('pagehide', flushVitals);
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') flushVitals();
+    });
   }
 
   var clickHandler = null, scrollHandler = null, activityHandler = null, exitHandler = null, routeHandler = null;
@@ -501,6 +581,11 @@
     window.Qingzhan.close = closeChat;
     window.Qingzhan.toggle = function () { chatOpen ? closeChat() : openChat(); };
     window.Qingzhan.track = function (name, payload) { trackEvent(name, payload); };
+    window.qz = window.qz || {};
+    window.qz.open = openChat;
+    window.qz.close = closeChat;
+    window.qz.toggle = function () { chatOpen ? closeChat() : openChat(); };
+    window.qz.track = function (name, payload) { trackEvent(name, payload); };
     window.Qingzhan.identify = function (data) {
       if (!data) return;
       if (data.phone) prechatData = JSON.stringify({ phone: data.phone, name: data.name || '' });

@@ -14,6 +14,8 @@
 
   function money(cents) { return '¥' + (Number(cents || 0) / 100).toFixed(2); }
   function load(root) {
+    var box = root.querySelector('#ref-body');
+    if (!box) return;
     A.api('/api/referral').then(function (d) {
       var s = d.stats;
       var rewardRows = d.rewards.map(function (r) {
@@ -30,7 +32,8 @@
         var cls = w.status === 'paid' ? 'green' : w.status === 'rejected' ? 'red' : 'orange';
         return '<tr><td class="mono">#' + w.id + '</td><td><b>' + money(w.amount_cents) + '</b></td><td><span class="pill ' + cls + '">' + st + '</span></td><td class="tiny muted">' + A.fmtTime(w.created_at) + '</td><td class="tiny muted">' + A.esc(w.note || '') + '</td></tr>';
       }).join('');
-      root.querySelector('#ref-body').innerHTML =
+      if (!root.contains(box)) return;
+      box.innerHTML =
         '<div class="referral-hero"><div><span class="kicker">REFERRAL PROGRAM</span><h2>邀请一位客户，获得首单 20% 奖励</h2><p>把链接发给正在找客服/线索工具的站长、朋友和客户。对方通过你的链接注册并完成首次付费，奖励在 7 天后可提现。</p>' +
           '<div class="ref-link-box"><span class="mono" data-ref-link>' + A.esc(d.link) + '</span><button class="au-btn au-btn--primary au-btn--sm" data-copy-ref>复制邀请链接</button></div>' +
           '<div class="tiny" style="margin-top:8px;opacity:.8">推广码：<b class="mono">' + A.esc(d.code) + '</b> · 最低提现 ' + money(d.rules.minWithdrawCents) + ' · 奖励结算周期 ' + d.rules.holdDays + ' 天</div></div>' +
@@ -48,7 +51,7 @@
       A.$$('[data-copy-ref]', root).forEach(function (b) { b.onclick = function () { A.copy(d.link); }; });
       var wb = root.querySelector('[data-withdraw]');
       if (wb) wb.onclick = function () { withdraw(d, root); };
-    }).catch(function (e) { A.handleError(e); root.querySelector('#ref-body').innerHTML = A.empty('加载失败', e.message); });
+    }).catch(function (e) { if (!root.contains(box)) return; A.handleError(e); box.innerHTML = A.empty('加载失败', e.message); });
   }
 
   function withdraw(d, root) {

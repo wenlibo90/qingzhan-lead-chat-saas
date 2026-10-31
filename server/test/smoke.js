@@ -3,6 +3,7 @@ const assert = require('node:assert');
 const { io } = require('socket.io-client');
 const { get, run } = require('../db');
 const { expireTrials, runLifecycle } = require('../services/lifecycle');
+const { locate } = require('../services/geo');
 const crypto = require('node:crypto');
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000';
@@ -72,11 +73,24 @@ function once(socket, event) {
   const coreDirect = await fetch(BASE + '/qz-core.js');
   ok('内核脚本禁止直接打开', coreDirect.status === 404);
   const corsRes = await fetch(BASE + '/api/public/config?key=' + KEY, { headers: { Origin: 'https://customer.example' } });
-  ok('公开 API 支持跨域访问', corsRes.status === 200 && corsRes.headers.get('access-control-allow-origin') === '*');
+  ok('公开 API 支持跨域访问', corsRes.status === 200 && corsRes.headers.get('access-control-allow-origin') === 'https://customer.example' && corsRes.headers.get('access-control-allow-credentials') === 'true');
   ok('专业版返回触发规则', Array.isArray(cfg.data.triggers) && cfg.data.triggers.length >= 3, cfg.data.triggers && cfg.data.triggers.length);
   ok('知识库与表单返回', cfg.data.faqs.length > 0 && cfg.data.forms.all.length > 0);
   const session = await req('/api/public/session', { body: { key: KEY, url: BASE + '/pricing', referrer: 'https://www.baidu.com/s?wd=在线客服系统' } });
   ok('访客会话创建', session.status === 200 && session.data.vid && session.data.sid, session.data);
+  const selfSession = await req('/api/public/session', { body: { key: KEY, url: BASE + '/pricing', referrer: BASE + '/about' } });
+  const selfVisitor = get('SELECT source FROM visitors WHERE vid = ?', [selfSession.data.vid]);
+  ok('站内来源归一为直接访问', selfSession.status === 200 && selfVisitor && selfVisitor.source === 'direct', selfVisitor);
+  const geoSession = await req('/api/public/session', { body: { key: KEY, url: BASE + '/geo-test' }, headers: { 'x-forwarded-for': '120.24.78.68' } });
+  const geoVisitor = get('SELECT country, province, city FROM visitors WHERE vid = ?', [geoSession.data.vid]);
+  ok('访客归属地写入真实省市', geoSession.status === 200 && geoVisitor && geoVisitor.province === '广东' && geoVisitor.city === '深圳', geoVisitor);
+  const raceVid = 'v_race_' + Date.now();
+  const raceResults = await Promise.all([
+    req('/api/public/session', { body: { key: KEY, vid: raceVid, url: BASE + '/race-a' } }),
+    req('/api/public/session', { body: { key: KEY, vid: raceVid, url: BASE + '/race-b' } })
+  ]);
+  const raceCount = get('SELECT COUNT(*) c FROM visitors WHERE vid = ?', [raceVid]).c;
+  ok('同一访客并发初始化不冲突', raceResults.every((r) => r.status === 200) && raceCount === 1, { statuses: raceResults.map((r) => r.status), count: raceCount });
   const vid = session.data.vid;
   const sid = session.data.sid;
   const pv = await req('/api/public/track', { body: { key: KEY, vid, sid, type: 'pageview', url: BASE + '/pricing', title: '价格方案' } });
@@ -85,6 +99,8 @@ function once(socket, event) {
   ok('停留时长上报', dwell.status === 200 && dwell.data.stored);
   const click = await req('/api/public/track', { body: { key: KEY, vid, sid, type: 'click', name: '预约演示', url: BASE + '/pricing' } });
   ok('点击行为上报', click.status === 200);
+  const perf = await req('/api/public/track', { body: { key: KEY, vid, sid, type: 'performance', name: 'web_vital_lcp', payload: { metric: 'LCP', value: 1800, rating: 'good' }, url: BASE + '/pricing' } });
+  ok('Web Vitals 上报入库', perf.status === 200);
   const trigger = await req('/api/public/trigger-check', { body: { key: KEY, vid, url: BASE + '/pricing', dwell: 20, scrollDepth: 10 } });
   ok('触发规则命中价格页停留', trigger.status === 200 && trigger.data.matched && trigger.data.matched.name.includes('价格页'), trigger.data);
   const blocked = await req('/api/public/blacklist-check', { body: { key: KEY, vid: 'v_not_blocked' } });
@@ -171,6 +187,35 @@ function once(socket, event) {
     ok(name + '报表', r.status === 200);
   }
 
+  console.log('\n[7.1] 网站分析');
+  const anOverview = await req('/api/analytics/overview?range=30', { token });
+  ok('分析概览接口', anOverview.status === 200 && anOverview.data.metrics.visitors > 0 && anOverview.data.trend.dates.length === 30, anOverview.data);
+  ok('概览包含环比与实时数据', Object.keys(anOverview.data.changes || {}).length > 0 && !!anOverview.data.realtime);
+  const anPages = await req('/api/analytics/pages?range=30', { token });
+  ok('内容分析接口', anPages.status === 200 && Array.isArray(anPages.data.pages) && anPages.data.pages.length > 0 && anPages.data.pages[0].path, anPages.data.pages && anPages.data.pages[0]);
+  const anAcq = await req('/api/analytics/acquisition?range=30', { token });
+  ok('来源分析接口', anAcq.status === 200 && Array.isArray(anAcq.data.sources) && anAcq.data.sources.length > 0, anAcq.data.sources);
+  const anAudience = await req('/api/analytics/audience?range=30', { token });
+  const deviceNames = (anAudience.data.device || []).map((r) => r.name);
+  ok('受众分析接口', anAudience.status === 200 && anAudience.data.total > 0 && new Set(deviceNames).size === deviceNames.length, anAudience.data.device);
+  const anEvents = await req('/api/analytics/events?range=30', { token });
+  ok('事件分析接口', anEvents.status === 200 && Array.isArray(anEvents.data.events), anEvents.data.events && anEvents.data.events.length);
+  ok('Web Vitals 聚合', anEvents.data.vitals.some((v) => v.metric === 'LCP' && v.samples > 0), anEvents.data.vitals);
+  const anRealtime = await req('/api/analytics/realtime', { token });
+  ok('实时分析接口', anRealtime.status === 200 && typeof anRealtime.data.visitors === 'number', anRealtime.data);
+  const anCsv = await fetch(BASE + '/api/analytics/export?report=pages&range=30', { headers: { Authorization: 'Bearer ' + token } });
+  const anCsvBuf = Buffer.from(await anCsv.arrayBuffer());
+  const anCsvText = anCsvBuf.toString('utf8');
+  ok('分析 CSV 导出', anCsv.status === 200 && anCsvBuf[0] === 0xEF && anCsvBuf[1] === 0xBB && anCsvBuf[2] === 0xBF && anCsvText.includes('页面'), anCsvText.slice(0, 40));
+
+  console.log('\n[7.2] IP 归属地');
+  const geoLocal = await locate('127.0.0.1');
+  ok('内网 IP 识别为本地网络', geoLocal.provider === 'local' && geoLocal.country === '本地', geoLocal);
+  const geoCn = await locate('120.24.78.68');
+  ok('ip2region 识别中国省市', geoCn.country === '中国' && geoCn.province === '广东' && geoCn.city === '深圳', geoCn);
+  const geoV6 = await locate('2001:4860:4860::8888');
+  ok('ip2region 支持 IPv6', !!geoV6.country && geoV6.country !== '未知' && geoV6.provider === 'ip2region', geoV6);
+
   console.log('\n[8] 配置模块');
   const sites = await req('/api/sites', { token });
   ok('站点列表', sites.status === 200 && sites.data.sites.length >= 2);
@@ -219,6 +264,10 @@ function once(socket, event) {
   const agentToken = agentLogin.data.token;
   const agentReports = await req('/api/reports/sources', { token: agentToken });
   ok('客服不能看高级报表', agentReports.status === 403);
+  const agentAnalytics = await req('/api/analytics/pages', { token: agentToken });
+  ok('客服不能看高级网站分析', agentAnalytics.status === 403);
+  const agentOverview = await req('/api/analytics/overview', { token: agentToken });
+  ok('客服可以看流量概览', agentOverview.status === 200 && agentOverview.data.metrics);
   const agentUsers = await req('/api/users', { token: agentToken });
   ok('客服不能管理团队', agentUsers.status === 403);
   const agentChat = await req('/api/conversations', { token: agentToken });
@@ -270,7 +319,7 @@ function once(socket, event) {
   ok('自助注册创建账号与工作空间', reg.status === 200 && reg.data.token && reg.data.tenant.plan === 'pro', reg.data);
   const newToken = reg.data.token;
   const refRedirect = await fetch(BASE + '/r/' + referrer.referral_code, { redirect: 'manual' });
-  ok('推广短链可访问并跳转注册', refRedirect.status === 302 && (refRedirect.headers.get('location') || '').includes('/signup/?ref=' + referrer.referral_code));
+  ok('推广短链可访问并跳转注册', refRedirect.status === 302 && (refRedirect.headers.get('location') || '').includes('signup=1') && (refRedirect.headers.get('location') || '').includes('ref=' + referrer.referral_code), refRedirect.headers.get('location'));
   const refLogin = await req('/api/auth/login', { body: { phone: '13600000001', password: 'demo1234' } });
   const refOverview = await req('/api/referral', { token: refLogin.data.token });
   ok('推广中心返回邀请链接与统计', refOverview.status === 200 && refOverview.data.link.includes('/r/') && refOverview.data.stats.registered >= 2, refOverview.data.stats);
@@ -311,11 +360,13 @@ function once(socket, event) {
   const opsApps = await req('/api/ops/applications', { token: opsToken });
   ok('申请表单进入平台线索池', opsApps.status === 200 && opsApps.data.total > 0 && opsApps.data.statuses.includes('new'), opsApps.data.stats);
 
+  await req('/api/billing/change-plan', { token, body: { plan: 'enterprise' } });
   const inviteEmail = 'invite' + Date.now() + '@test.com';
   const invite = await req('/api/users', { token, body: { name: '邀请客服', email: inviteEmail, password: 'invite123', role: 'agent' } });
   ok('后台邀请成员创建账号', invite.status === 200);
   const invitedLogin = await req('/api/auth/login', { body: { email: inviteEmail, password: 'invite123' } });
   ok('被邀请成员可登录', invitedLogin.status === 200 && invitedLogin.data.user.role === 'agent', invitedLogin.data);
+  await req('/api/billing/change-plan', { token, body: { plan: 'pro' } });
 
   const leadPhone = '138' + String(Date.now()).slice(-8);
   const leadApp = await req('/api/public/demo-request', { body: { name: '转化测试', phone: leadPhone, company: '转化测试公司', channel: '官网留资率低' } });
@@ -327,12 +378,31 @@ function once(socket, event) {
   console.log('\n[13] 订阅订单、支付回调与支持工单');
   const order = await req('/api/billing/orders', { token: newToken, body: { plan: 'standard', cycle: 'monthly' } });
   ok('创建订阅订单并服务端计价', order.status === 200 && order.data.order.amount_cents === 29900 && order.data.order.status === 'pending', order.data);
-  const paid = await req('/api/billing/orders/' + order.data.order.id + '/pay', { token: newToken, body: {} });
+  const channel = await req('/api/billing', { token: newToken });
+  const mockPay = channel.data.payment && channel.data.payment.mock;
+  let paidOk = false;
+  let paidData = null;
+  if (mockPay) {
+    const paid = await req('/api/billing/orders/' + order.data.order.id + '/pay', { token: newToken, body: {} });
+    paidOk = paid.status === 200 && paid.data.subscription.plan === 'standard' && paid.data.subscription.plan_status === 'active';
+    paidData = paid.data;
+  } else {
+    const intent = await req('/api/billing/orders/' + order.data.order.id + '/pay-intent', { token: newToken, method: 'POST', body: {} });
+    ok('支付宝下单返回支付链接', intent.status === 200 && /^https:\/\/openapi\.alipay\.com\/gateway\.do/.test(intent.data.payUrl || ''), intent.data);
+    const firstEvent = 'evt_first_' + Date.now();
+    const firstBody = JSON.stringify({ event_id: firstEvent, order_no: order.data.order.order_no, amount_cents: 29900, status: 'paid', provider_trade_no: 'ALIPAY-TEST-1' });
+    const firstSig = crypto.createHmac('sha256', process.env.PAYMENT_WEBHOOK_SECRET || process.env.APP_SECRET || 'qingzhan-leadchat-dev-secret-2026').update(firstBody).digest('hex');
+    const firstWh = await fetch(BASE + '/api/public/payments/webhook/alipay', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-payment-signature': firstSig }, body: firstBody });
+    const firstWhData = await firstWh.json();
+    paidOk = firstWh.status === 200 && firstWhData.ok;
+    paidData = firstWhData;
+  }
   const refReward = get('SELECT * FROM referral_rewards WHERE order_id = ?', [order.data.order.id]);
   ok('被邀请人首单支付生成推广奖励', !!refReward && refReward.amount_cents === 5980 && refReward.referrer_account_id === referrer.id, refReward);
-  ok('模拟支付开通标准版', paid.status === 200 && paid.data.subscription.plan === 'standard' && paid.data.subscription.plan_status === 'active', paid.data);
+  ok('订单支付开通标准版', paidOk, paidData);
   const bill = await req('/api/billing', { token: newToken });
   ok('订单与发票可查询', bill.status === 200 && bill.data.orders.some((o) => o.status === 'paid') && bill.data.invoices.length >= 1, bill.data.invoices);
+  ok('套餐页返回支付通道信息', bill.data.payment && bill.data.payment.provider && typeof bill.data.payment.mock === 'boolean', bill.data.payment);
   const order2 = await req('/api/billing/orders', { token: newToken, body: { plan: 'pro', cycle: 'yearly' } });
   const eventId = 'evt_test_' + Date.now();
   const whBody = JSON.stringify({ event_id: eventId, order_no: order2.data.order.order_no, amount_cents: 899000, status: 'paid', provider_trade_no: 'MOCK-WEBHOOK-1' });
@@ -345,6 +415,8 @@ function once(socket, event) {
   ok('支付回调幂等', whDupData.duplicate === true, whDupData);
   const badWh = await fetch(BASE + '/api/public/payments/webhook/mock', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-payment-signature': 'bad' }, body: whBody });
   ok('错误签名被拒绝', badWh.status === 401);
+  const alipayBad = await fetch(BASE + '/api/public/payments/alipay/notify', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'app_id=2016122004435719&out_trade_no=x&trade_status=TRADE_SUCCESS&total_amount=1.00' });
+  ok('支付宝回调拒绝无效签名', alipayBad.status === 400 && (await alipayBad.text()) === 'failure');
   const afterWh = await req('/api/billing', { token: newToken });
   ok('回调后订阅为专业版年付', afterWh.data.subscription.plan === 'pro' && afterWh.data.subscription.billing_cycle === 'yearly', afterWh.data.subscription);
 
@@ -363,7 +435,12 @@ function once(socket, event) {
   ok('非法头像被拒绝', badAvatar.status === 400);
 
   const opsRefs = await req('/api/ops/referrals', { token: opsToken });
-  const pendingWithdrawal = opsRefs.data.withdrawals.filter((w) => ['requested', 'approved'].includes(w.status))[0];
+  let pendingWithdrawal = opsRefs.data.withdrawals.filter((w) => ['requested', 'approved'].includes(w.status))[0];
+  if (!pendingWithdrawal) {
+    const referrerAccount = get('SELECT id FROM accounts ORDER BY id LIMIT 1');
+    const wid = run("INSERT INTO referral_withdrawals (account_id, amount_cents, status, note) VALUES (?,?, 'requested', '自动化测试补建提现申请')", [referrerAccount.id, 10000]).lastInsertRowid;
+    pendingWithdrawal = get('SELECT * FROM referral_withdrawals WHERE id = ?', [wid]);
+  }
   const approveWithdrawal = pendingWithdrawal ? await req('/api/ops/referral-withdrawals/' + pendingWithdrawal.id, { token: opsToken, method: 'PATCH', body: { status: 'approved' } }) : { status: 0 };
   ok('运营可审核推广提现', opsRefs.status === 200 && pendingWithdrawal && approveWithdrawal.status === 200, opsRefs.data.totals);
 

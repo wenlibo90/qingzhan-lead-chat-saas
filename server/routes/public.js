@@ -35,11 +35,15 @@ function parseUA(ua = '') {
   return { browser, os, device };
 }
 
-function sourceFrom(referrer, utmSource) {
+function sourceFrom(referrer, utmSource, selfHosts = []) {
   if (utmSource) return String(utmSource).slice(0, 40);
   if (!referrer) return 'direct';
   try {
-    const host = new URL(referrer).hostname.replace(/^www\./, '');
+    const host = new URL(referrer).hostname.replace(/^www\./, '').toLowerCase();
+    if (!host) return 'direct';
+    const self = selfHosts.map((h) => String(h || '').replace(/^www\./, '').toLowerCase()).filter(Boolean);
+    if (self.some((h) => host === h || host.endsWith('.' + h) || h.endsWith('.' + host))) return 'direct';
+    if (host === 'localhost' || host === '::1' || /^127\./.test(host)) return 'local';
     const map = {
       'baidu.com': 'baidu', 'google.com': 'google', 'bing.com': 'bing', 'sogou.com': 'sogou',
       'so.com': '360', 'zhihu.com': 'zhihu', 'weixin.qq.com': 'wechat', 'douyin.com': 'douyin',
@@ -95,7 +99,8 @@ async function upsertVisitor(site, req, data = {}) {
   if (!visitor) {
     const geo = await locate(ip);
     const referrer = data.referrer || req.headers.referer || '';
-    const source = data.utm_source || sourceFrom(referrer, '');
+    const selfHosts = [site.domain, String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].split(':')[0]];
+    const source = data.utm_source || sourceFrom(referrer, '', selfHosts);
     const info = {
       tenant_id: site.tenant_id, site_id: site.id, vid, fingerprint,
       ip, country: geo.country, province: geo.province, city: geo.city,
@@ -107,14 +112,19 @@ async function upsertVisitor(site, req, data = {}) {
       referrer: String(referrer).slice(0, 500), keyword: data.utm_term || keywordFrom(referrer),
       landing_page: data.url || '', tracking_consent: data.consent === false ? 0 : 1
     };
-    const id = run(
-      `INSERT INTO visitors (tenant_id, site_id, vid, fingerprint, ip, country, province, city, device, browser, os, language, screen, source, utm_source, utm_medium, utm_campaign, utm_term, utm_content, referrer, keyword, landing_page, tracking_consent)
+    const inserted = run(
+      `INSERT OR IGNORE INTO visitors (tenant_id, site_id, vid, fingerprint, ip, country, province, city, device, browser, os, language, screen, source, utm_source, utm_medium, utm_campaign, utm_term, utm_content, referrer, keyword, landing_page, tracking_consent)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [info.tenant_id, info.site_id, info.vid, info.fingerprint, info.ip, info.country, info.province, info.city,
         info.device, info.browser, info.os, info.language, info.screen, info.source, info.utm_source, info.utm_medium,
         info.utm_campaign, info.utm_term, info.utm_content, info.referrer, info.keyword, info.landing_page, info.tracking_consent]
-    ).lastInsertRowid;
-    visitor = get('SELECT * FROM visitors WHERE id = ?', [id]);
+    );
+    if (!inserted.changes) {
+      visitor = get('SELECT * FROM visitors WHERE tenant_id = ? AND site_id = ? AND vid = ?', [site.tenant_id, site.id, vid]);
+      if (visitor) return { visitor, merged: false, vid: visitor.vid };
+      throw new Error('访客创建失败');
+    }
+    visitor = get('SELECT * FROM visitors WHERE id = ?', [inserted.lastInsertRowid]);
   } else {
     run(
       `UPDATE visitors SET last_seen = datetime('now'), ip = ?, device = COALESCE(NULLIF(?, ''), device),
@@ -355,7 +365,7 @@ router.post('/track', async (req, res) => {
       }
     }
     recalcVisitorIntent(site.tenant_id, visitor.id);
-  } else if (type === 'click' || type === 'scroll' || type === 'event' || type === 'exit' || type === 'adblock') {
+  } else if (type === 'click' || type === 'scroll' || type === 'event' || type === 'exit' || type === 'adblock' || type === 'performance') {
     run(
       'INSERT INTO events (tenant_id, site_id, visitor_id, session_id, type, name, payload, url) VALUES (?,?,?,?,?,?,?,?)',
       [site.tenant_id, site.id, visitor.id, sid, type, String(body.name || '').slice(0, 80), JSON.stringify(body.payload || {}).slice(0, 4000), String(body.url || '').slice(0, 500)]
