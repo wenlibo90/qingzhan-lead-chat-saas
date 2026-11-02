@@ -281,6 +281,31 @@ function once(socket, event) {
   const ownerSite = await req('/api/sites', { token: ownerToken });
   ok('租户数据隔离（站点不串）', ownerSite.status === 200 && ownerSite.data.sites.every((s) => s.site_key !== KEY));
 
+  console.log('\n[9.1] 云笔记');
+  const noteBooks = await req('/api/notes/books', { token });
+  ok('云笔记默认笔记本', noteBooks.status === 200 && noteBooks.data.books.length >= 4, noteBooks.data.books);
+  const noteCreate = await req('/api/notes', { token, body: { notebookId: noteBooks.data.books[0].id, title: '集成测试云笔记', content: '# 云笔记\n\n自动保存测试', tag: 'blue' } });
+  ok('云笔记新建', noteCreate.status === 200 && noteCreate.data.note && noteCreate.data.note.id, noteCreate.data);
+  const noteId = noteCreate.data.note.id;
+  const notePatch = await req('/api/notes/' + noteId, { token, method: 'PATCH', body: { title: '集成测试云笔记-更新', content: '更新后的内容', version: 1 } });
+  ok('云笔记自动保存与版本递增', notePatch.status === 200 && notePatch.data.note.version === 2, notePatch.data.note);
+  const noteSearch = await req('/api/notes?q=' + encodeURIComponent('云笔记'), { token });
+  ok('云笔记搜索', noteSearch.status === 200 && noteSearch.data.notes.some((n) => n.id === noteId), noteSearch.data.total);
+  const noteAgent = await req('/api/notes/' + noteId, { token: agentToken });
+  ok('客服只能访问自己的个人笔记', noteAgent.status === 404);
+  const noteOwner = await req('/api/notes/' + noteId, { token: ownerToken });
+  ok('云笔记租户隔离', noteOwner.status === 404);
+  const noteDel = await req('/api/notes/' + noteId, { token, method: 'DELETE' });
+  ok('云笔记移入回收站', noteDel.status === 200 && noteDel.data.note.status === 'trash');
+  const noteTrash = await req('/api/notes?view=trash', { token });
+  ok('云笔记回收站列表', noteTrash.status === 200 && noteTrash.data.notes.some((n) => n.id === noteId));
+  const noteRestore = await req('/api/notes/' + noteId + '/restore', { token, method: 'POST', body: {} });
+  ok('云笔记恢复', noteRestore.status === 200 && noteRestore.data.note.status === 'normal');
+  const notePurge = await req('/api/notes/' + noteId + '/purge', { token, method: 'DELETE' });
+  ok('云笔记永久删除', notePurge.status === 200);
+  const notesPage = await fetch(BASE + '/notes');
+  ok('云笔记页面可访问', notesPage.status === 200);
+
   console.log('\n[10] 开放 API');
   const key = get('SELECT * FROM api_keys WHERE tenant_id = 1 AND enabled = 1');
   const extLocked = await req('/api/v1/stats', { headers: { 'x-api-key': key.key } });

@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>轻客服云笔记</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #eef3ff;
+            --panel: rgba(255, 255, 255, 0.86);
+            --text: #111827;
+            --muted: #64748b;
+            --line: rgba(148, 163, 184, 0.28);
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-soft: #dbeafe;
+            --shadow: 0 24px 70px rgba(15, 23, 42, 0.16);
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --purple: #8b5cf6;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; overflow: hidden; }
+        body {
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, rgba(37, 99, 235, 0.18), transparent 34vw),
+                radial-gradient(circle at bottom right, rgba(139, 92, 246, 0.14), transparent 30vw),
+                linear-gradient(135deg, #f8fbff 0%, var(--bg) 100%);
+        }
+        button, input, textarea, select { font: inherit; }
+        button { cursor: pointer; border: 0; }
+
+        /* ===== Layout ===== */
+        .app-shell {
+            height: 100vh; padding: 18px;
+            display: grid;
+            grid-template-columns: 230px 320px minmax(0, 1fr);
+            gap: 14px; overflow: hidden;
+        }
+        .sidebar, .note-list, .editor-panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            display: flex; flex-direction: column;
+            overflow: hidden;
+            height: calc(100vh - 36px);
+        }
+
+        /* ===== Sidebar ===== */
+        .sidebar { padding: 20px 16px; gap: 12px; }
+        .brand { display: flex; align-items: center; gap: 11px; }
+        .brand-mark {
+            width: 40px; height: 40px; border-radius: 40px;
+            color: #fff;
+            background: linear-gradient(135deg, var(--primary), #8b5cf6);
+            display: grid; place-items: center; flex-shrink: 0;
+            box-shadow: 0 12px 26px rgba(37, 99, 235, 0.26);
+        }
+        .brand-mark svg { width: 20px; height: 20px; }
+        .brand-mark [data-lucide] { width: 20px; height: 20px; }
+        .brand h1 { margin: 0; font-size: 17px; letter-spacing: -0.02em; }
+        .brand p { margin: 2px 0 0; color: var(--muted); font-size: 11px; }
+
+        .new-note-btn {
+            width: 100%; padding: 12px 14px;
+            color: #fff; font-weight: 700; font-size: 14px;
+            background: linear-gradient(135deg, var(--primary), #8b5cf6);
+            border-radius: 16px;
+            box-shadow: 0 14px 30px rgba(37, 99, 235, 0.22);
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .new-note-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 16px 34px rgba(37, 99, 235, 0.28);
+        }
+        .new-note-btn svg { width: 17px; height: 17px; }
+        .new-note-btn [data-lucide] { width: 17px; height: 17px; }
+
+        .section-label {
+            font-size: 11px; font-weight: 700; color: var(--muted);
+            text-transform: uppercase; letter-spacing: 0.06em;
+            padding: 8px 4px 4px; margin-top: 4px;
+        }
+
+        .nav-list { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+
+        .nav-item {
+            width: 100%; padding: 10px 12px;
+            border-radius: 13px; background: transparent;
+            color: #334155; font-size: 13.5px;
+            display: flex; align-items: center; gap: 9px;
+            transition: background 0.15s ease, color 0.15s ease;
+            text-align: left;
+        }
+        .nav-item:hover { background: rgba(255, 255, 255, 0.65); }
+        .nav-item.active {
+            background: #ffffff; color: var(--primary);
+            border: 1px solid rgba(37, 99, 235, 0.18);
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+        }
+        .nav-item svg { width: 17px; height: 17px; flex-shrink: 0; opacity: 0.65; }
+        .nav-item [data-lucide] { width: 17px; height: 17px; flex-shrink: 0; opacity: 0.65; }
+        .nav-item.active svg { opacity: 1; }
+        .nav-item.active [data-lucide] { opacity: 1; }
+        .nav-item .count {
+            margin-left: auto;
+            font-size: 11px; font-weight: 600; color: var(--muted);
+            min-width: 20px; text-align: right;
+        }
+        .nav-item.active .count { color: var(--primary); }
+
+        .notebook-dot {
+            width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+        }
+
+        .add-notebook-btn {
+            width: 100%; padding: 9px 12px;
+            border-radius: 13px; background: transparent;
+            color: var(--muted); font-size: 13px;
+            display: flex; align-items: center; gap: 8px;
+            transition: background 0.15s ease, color 0.15s ease;
+            border: 1px dashed rgba(148, 163, 184, 0.4);
+        }
+        .add-notebook-btn:hover { background: rgba(255, 255, 255, 0.5); color: var(--primary); }
+        .add-notebook-btn svg { width: 15px; height: 15px; }
+        .add-notebook-btn [data-lucide] { width: 15px; height: 15px; }
+
+        .sidebar-footer { padding-top: 10px; border-top: 1px solid var(--line); }
+        .sidebar-note { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; text-align: center; }
+        .storage-bar { margin: 8px 4px 0; }
+        .storage-track { height: 4px; border-radius: 99px; background: rgba(148, 163, 184, 0.2); overflow: hidden; }
+        .storage-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--primary), #8b5cf6); transition: width 0.4s ease; }
+        .storage-text { margin-top: 4px; font-size: 11px; color: var(--muted); }
+
+        /* ===== Note List ===== */
+        .note-list-header {
+            padding: 18px 18px 0; flex-shrink: 0;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .note-list-top {
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .note-list-top h2 { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+        .note-list-top .count-badge {
+            font-size: 12px; color: var(--muted); font-weight: 400;
+        }
+        .sort-btn {
+            padding: 6px 10px; border-radius: 10px;
+            color: var(--muted); font-size: 12px;
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid var(--line);
+            display: flex; align-items: center; gap: 4px;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+        .sort-btn:hover { background: #fff; color: var(--primary); }
+        .sort-btn svg { width: 14px; height: 14px; }
+        .sort-btn [data-lucide] { width: 14px; height: 14px; }
+
+        .search-wrap { position: relative; }
+        .search-wrap svg,
+        .search-wrap [data-lucide] {
+            position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+            width: 15px; height: 15px; color: var(--muted); pointer-events: none;
+        }
+        .search-box {
+            width: 100%; height: 40px; padding: 0 14px 0 36px;
+            border: 1px solid var(--line); border-radius: 13px;
+            outline: 0; color: var(--text);
+            background: rgba(255, 255, 255, 0.7);
+            font-size: 13px;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .search-box:focus {
+            border-color: rgba(37, 99, 235, 0.5);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+        }
+
+        .note-items {
+            flex: 1; min-height: 0; overflow-y: auto;
+            padding: 8px 8px; display: flex; flex-direction: column; gap: 4px;
+        }
+
+        .note-card {
+            width: 100%; padding: 14px;
+            border-radius: 16px; background: transparent;
+            border: 1px solid transparent;
+            text-align: left; color: var(--text);
+            transition: all 0.15s ease;
+            position: relative;
+        }
+        .note-card:hover { background: rgba(255, 255, 255, 0.55); }
+        .note-card.active {
+            background: #ffffff;
+            border-color: rgba(37, 99, 235, 0.16);
+            box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+        }
+        .note-card-title {
+            font-size: 14px; font-weight: 700; color: #1e293b;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            margin-bottom: 4px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .note-card-title .pin-icon { color: var(--warning); flex-shrink: 0; }
+        .note-card-title .pin-icon svg { width: 12px; height: 12px; }
+        .note-card-title .pin-icon [data-lucide] { width: 12px; height: 12px; }
+        .note-card-preview {
+            font-size: 12.5px; color: var(--muted); line-height: 1.55;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+            overflow: hidden; margin-bottom: 8px;
+        }
+        .note-card-footer {
+            display: flex; align-items: center; gap: 6px; font-size: 11px; color: #94a3b8;
+        }
+        .note-tag {
+            display: inline-block; font-size: 10px; font-weight: 600;
+            padding: 1px 7px; border-radius: 99px;
+        }
+        .tag-blue { background: #dbeafe; color: #1d4ed8; }
+        .tag-green { background: #d1fae5; color: #059669; }
+        .tag-purple { background: #ede9fe; color: #7c3aed; }
+        .tag-orange { background: #fef3c7; color: #d97706; }
+        .tag-pink { background: #fce7f3; color: #be185d; }
+        .tag-gray { background: #f1f5f9; color: #475569; }
+
+        .note-card .star-toggle {
+            position: absolute; right: 10px; top: 12px;
+            background: none; padding: 4px; color: #cbd5e1;
+            transition: color 0.15s ease, transform 0.15s ease;
+        }
+        .note-card .star-toggle:hover { transform: scale(1.15); }
+        .note-card .star-toggle.starred { color: var(--warning); }
+        .note-card .star-toggle svg { width: 14px; height: 14px; }
+        .note-card .star-toggle [data-lucide] { width: 14px; height: 14px; }
+
+        /* ===== Editor Panel ===== */
+        .editor-panel { position: relative; }
+
+        .editor-toolbar {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.5);
+            display: flex; align-items: center; justify-content: space-between;
+            flex-shrink: 0; gap: 8px;
+        }
+        .toolbar-group {
+            display: flex; align-items: center; gap: 2px;
+        }
+        .toolbar-btn {
+            width: 34px; height: 34px; border-radius: 9px;
+            background: transparent; color: #475569;
+            display: grid; place-items: center;
+            transition: background 0.12s ease, color 0.12s ease;
+        }
+        .toolbar-btn:hover { background: rgba(255, 255, 255, 0.8); color: var(--primary); }
+        .toolbar-btn.active { background: var(--primary-soft); color: var(--primary); }
+        .toolbar-btn svg { width: 16px; height: 16px; }
+        .toolbar-btn [data-lucide] { width: 16px; height: 16px; }
+        .toolbar-sep {
+            width: 1px; height: 20px; background: var(--line); margin: 0 6px;
+        }
+
+        .toolbar-right {
+            display: flex; align-items: center; gap: 6px;
+        }
+        .tag-select {
+            padding: 5px 10px; border-radius: 10px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.7);
+            font-size: 12px; color: var(--text);
+            outline: none; cursor: pointer;
+        }
+        .tag-select:focus { border-color: rgba(37, 99, 235, 0.4); }
+        .word-count {
+            font-size: 11px; color: var(--muted); white-space: nowrap;
+        }
+
+        .editor-area {
+            flex: 1; min-height: 0; overflow-y: auto;
+            display: flex; flex-direction: column;
+        }
+
+        .editor-title-wrap {
+            padding: 24px 28px 0; flex-shrink: 0;
+        }
+        .editor-title {
+            width: 100%; border: none; outline: none;
+            font-size: 26px; font-weight: 800;
+            letter-spacing: -0.02em;
+            color: var(--text); background: transparent;
+        }
+        .editor-title::placeholder { color: #cbd5e1; }
+
+        .editor-meta {
+            padding: 8px 28px 0;
+            display: flex; align-items: center; gap: 12px;
+            font-size: 12px; color: var(--muted); flex-shrink: 0;
+        }
+        .editor-meta-sep { color: #cbd5e1; }
+
+        .editor-content-wrap {
+            flex: 1; min-height: 0; padding: 16px 28px 28px;
+            position: relative;
+        }
+        .editor-content {
+            width: 100%; height: 100%; border: none; outline: none;
+            resize: none;
+            font-size: 15px; line-height: 1.9;
+            color: #334155; background: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+        }
+        .editor-content::placeholder { color: #cbd5e1; }
+
+        /* Preview mode */
+        .preview-content {
+            font-size: 15px; line-height: 1.9; color: #334155;
+            padding: 0; display: none;
+        }
+        .preview-content h1 { font-size: 24px; font-weight: 800; margin: 20px 0 12px; color: var(--text); }
+        .preview-content h2 { font-size: 20px; font-weight: 700; margin: 18px 0 10px; color: var(--text); }
+        .preview-content h3 { font-size: 17px; font-weight: 700; margin: 14px 0 8px; color: var(--text); }
+        .preview-content p { margin-bottom: 12px; }
+        .preview-content strong { font-weight: 700; color: var(--text); }
+        .preview-content em { font-style: italic; }
+        .preview-content code {
+            background: rgba(37, 99, 235, 0.08); color: var(--primary);
+            padding: 2px 6px; border-radius: 5px; font-size: 13px;
+            font-family: "SF Mono", "Fira Code", monospace;
+        }
+        .preview-content pre {
+            background: rgba(15, 23, 42, 0.04);
+            border: 1px solid var(--line);
+            border-radius: 12px; padding: 16px; margin: 12px 0;
+            overflow-x: auto; font-size: 13px; line-height: 1.6;
+            font-family: "SF Mono", "Fira Code", monospace;
+        }
+        .preview-content ul, .preview-content ol { margin: 8px 0 12px 20px; }
+        .preview-content li { margin-bottom: 4px; }
+        .preview-content blockquote {
+            border-left: 3px solid var(--primary);
+            padding: 8px 16px; margin: 12px 0;
+            background: rgba(37, 99, 235, 0.04);
+            border-radius: 0 8px 8px 0;
+            color: var(--muted);
+        }
+        .preview-content hr {
+            border: none; border-top: 1px solid var(--line); margin: 20px 0;
+        }
+        .preview-content a { color: var(--primary); text-decoration: underline; }
+        .preview-content .task-item { list-style: none; margin-left: -20px; }
+        .preview-content .task-check {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid #94a3b8; border-radius: 4px;
+            margin-right: 8px; vertical-align: middle;
+            position: relative; top: -1px;
+        }
+        .preview-content .task-check.checked {
+            background: var(--primary); border-color: var(--primary);
+        }
+        .preview-content .task-check.checked::after {
+            content: ''; position: absolute;
+            left: 3px; top: 0; width: 5px; height: 8px;
+            border: solid #fff; border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+
+        /* ===== Empty State ===== */
+        .empty-state {
+            margin: auto; text-align: center; color: var(--muted); padding: 40px;
+        }
+        .empty-state svg { width: 56px; height: 56px; color: #cbd5e1; margin-bottom: 14px; }
+        .empty-state [data-lucide] { width: 56px; height: 56px; color: #cbd5e1; margin-bottom: 14px; }
+        .empty-state h3 { margin: 0 0 6px; color: var(--text); font-size: 19px; }
+        .empty-state p { margin: 0; font-size: 13px; line-height: 1.6; }
+
+        /* ===== Toast ===== */
+        .toast-container {
+            position: fixed; bottom: 24px; left: 50%;
+            transform: translateX(-50%); z-index: 200;
+            display: flex; flex-direction: column-reverse; gap: 8px;
+            align-items: center; pointer-events: none;
+        }
+        .toast {
+            padding: 11px 18px; border-radius: 16px;
+            background: rgba(15, 23, 42, 0.88);
+            color: #fff; font-size: 13.5px; font-weight: 500;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.18);
+            display: flex; align-items: center; gap: 9px;
+            animation: toastIn 0.3s ease-out;
+            pointer-events: auto;
+        }
+        .toast.leaving { animation: toastOut 0.25s ease-in forwards; }
+        .toast svg { width: 17px; height: 17px; flex-shrink: 0; }
+        .toast [data-lucide] { width: 17px; height: 17px; flex-shrink: 0; }
+        .toast.success svg { color: var(--success); }
+        .toast.info svg { color: var(--primary); }
+        .toast.warning svg { color: var(--warning); }
+        .toast.success [data-lucide] { color: var(--success); }
+        .toast.info [data-lucide] { color: var(--primary); }
+        .toast.warning [data-lucide] { color: var(--warning); }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(10px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateY(0) scale(1); }
+            to { opacity: 0; transform: translateY(-6px) scale(0.96); }
+        }
+
+        /* ===== Confirm Dialog ===== */
+        .dialog-backdrop {
+            position: fixed; inset: 0; z-index: 150;
+            padding: 24px; display: grid; place-items: center;
+            background: rgba(15, 23, 42, 0.38);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+        .dialog-backdrop[hidden] { display: none; }
+        .dialog-backdrop.visible { opacity: 1; pointer-events: auto; }
+        .dialog-card {
+            width: min(400px, 100%); padding: 22px;
+            border: 1px solid var(--line); border-radius: 26px;
+            background: radial-gradient(circle at top left, rgba(37, 99, 235, 0.1), transparent 45%),
+                rgba(255, 255, 255, 0.94);
+            box-shadow: 0 28px 90px rgba(15, 23, 42, 0.26);
+            transform: translateY(12px) scale(0.96);
+            transition: transform 0.2s ease;
+        }
+        .dialog-backdrop.visible .dialog-card { transform: translateY(0) scale(1); }
+        .dialog-top { display: flex; align-items: flex-start; gap: 14px; }
+        .dialog-icon {
+            width: 42px; height: 42px; flex-shrink: 0;
+            border-radius: 15px; color: #fff;
+            background: linear-gradient(135deg, var(--primary), #0ea5e9);
+            display: grid; place-items: center; font-weight: 800; font-size: 18px;
+            box-shadow: 0 14px 28px rgba(37, 99, 235, 0.25);
+        }
+        .dialog-icon.danger { background: linear-gradient(135deg, #ef4444, #f97316); box-shadow: 0 14px 28px rgba(239, 68, 68, 0.22); }
+        .dialog-copy { flex: 1; min-width: 0; }
+        .dialog-title { margin: 0; font-size: 18px; letter-spacing: -0.02em; }
+        .dialog-message { margin: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.7; }
+        .dialog-close-btn {
+            width: 32px; height: 32px; border-radius: 50%;
+            color: #64748b; background: rgba(241, 245, 249, 0.85);
+            font-size: 18px; line-height: 1;
+            display: grid; place-items: center;
+        }
+        .dialog-close-btn:hover { color: #0f172a; background: #e2e8f0; }
+        .dialog-icon [data-lucide],
+        .dialog-icon svg {
+            width: 20px;
+            height: 20px;
+        }
+        .dialog-close-btn [data-lucide],
+        .dialog-close-btn svg {
+            width: 17px;
+            height: 17px;
+        }
+        .dialog-input {
+            width: 100%; height: 44px; margin-top: 16px;
+            padding: 0 14px; border: 1px solid var(--line); border-radius: 14px;
+            outline: 0; color: var(--text);
+            background: rgba(255, 255, 255, 0.86); font-size: 14px;
+        }
+        .dialog-input:focus { border-color: rgba(37, 99, 235, 0.5); box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); }
+        .dialog-colors {
+            margin-top: 14px; display: flex; gap: 8px;
+        }
+        .color-dot {
+            width: 28px; height: 28px; border-radius: 50%;
+            border: 2px solid transparent;
+            transition: transform 0.12s ease, border-color 0.12s ease;
+            cursor: pointer;
+        }
+        .color-dot:hover { transform: scale(1.1); }
+        .color-dot.selected { border-color: var(--text); transform: scale(1.1); }
+        .dialog-actions { margin-top: 18px; display: flex; justify-content: flex-end; gap: 10px; }
+        .dialog-btn {
+            min-width: 80px; height: 40px; padding: 0 16px;
+            border-radius: 14px; font-weight: 700; font-size: 14px;
+        }
+        .dialog-btn.secondary { color: #334155; background: #eef2f7; }
+        .dialog-btn.secondary:hover { background: #e2e8f0; }
+        .dialog-btn.primary { color: #fff; background: linear-gradient(135deg, var(--primary), #0ea5e9); box-shadow: 0 12px 24px rgba(37, 99, 235, 0.2); }
+        .dialog-btn.primary.danger { background: linear-gradient(135deg, #ef4444, #f97316); box-shadow: 0 12px 24px rgba(239, 68, 68, 0.2); }
+
+        /* ===== Scrollbar ===== */
+        .note-items::-webkit-scrollbar, .editor-area::-webkit-scrollbar,
+        .nav-list::-webkit-scrollbar, .editor-content-wrap::-webkit-scrollbar { width: 5px; }
+        .note-items::-webkit-scrollbar-thumb, .editor-area::-webkit-scrollbar-thumb,
+        .nav-list::-webkit-scrollbar-thumb, .editor-content-wrap::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.25); border-radius: 99px;
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 1060px) {
+            .app-shell { grid-template-columns: 200px 280px minmax(0, 1fr); padding: 12px; gap: 10px; }
+        }
+        @media (max-width: 820px) {
+            .app-shell {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto minmax(0, 1fr);
+                padding: 10px; gap: 8px;
+            }
+            .sidebar { height: auto; flex-direction: row; flex-wrap: wrap; padding: 12px; gap: 6px; overflow: visible; }
+            .brand { width: 100%; }
+            .new-note-btn { width: auto; flex: 1; }
+            .nav-list { flex-direction: row; overflow-x: auto; min-height: auto; flex-wrap: nowrap; }
+            .nav-item { white-space: nowrap; flex-shrink: 0; }
+            .section-label { display: none; }
+            .add-notebook-btn { display: none; }
+            .sidebar-footer { display: none; }
+            .note-list { height: 260px; }
+            .editor-panel { height: calc(100vh - 340px); }
+        }
+        @media (max-width: 560px) {
+            .app-shell { padding: 0; gap: 0; }
+            .sidebar, .note-list, .editor-panel { border-radius: 0; box-shadow: none; }
+            .editor-title-wrap, .editor-meta, .editor-content-wrap { padding-left: 16px; padding-right: 16px; }
+            .editor-toolbar { padding: 10px 12px; overflow-x: auto; }
+        }
+
+        /* ===== Animations ===== */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .note-card { animation: fadeIn 0.2s ease-out; }
+    </style>
+</head>
+<body>
+    <main class="app-shell">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-mark">
+                    <i data-lucide="notebook-tabs"></i>
+                </div>
+                <div>
+                    <h1>轻客服云笔记</h1>
+                    <p>轻客服 SaaS · 知识沉淀</p>
+                </div>
+            </div>
+
+            <button class="new-note-btn" id="newNoteBtn" type="button">
+                <i data-lucide="square-pen"></i>
+                新建笔记
+            </button>
+
+            <div class="section-label">快速访问</div>
+            <nav class="nav-list" id="quickNav"></nav>
+
+            <div class="section-label" style="margin-top: 8px;">笔记本</div>
+            <nav class="nav-list" id="notebookNav"></nav>
+            <button class="add-notebook-btn" id="addNotebookBtn" type="button">
+                <i data-lucide="folder-plus"></i>
+                新建笔记本
+            </button>
+
+            <div class="sidebar-footer">
+                <a class="nav-item" href="/admin/" style="text-decoration:none;margin-bottom:8px;"><i data-lucide="layout-grid"></i><span>返回工作台</span></a>
+                <div class="storage-bar">
+                    <div class="storage-track"><div class="storage-fill" id="storageFill" style="width: 34%;"></div></div>
+                    <div class="storage-text" id="storageText">已用 3.4 GB / 10 GB</div>
+                </div>
+                <p class="sidebar-note" style="margin-top:8px;">© 2026 轻客服 SaaS · 云笔记</p>
+            </div>
+        </aside>
+
+        <!-- Note List -->
+        <section class="note-list">
+            <div class="note-list-header">
+                <div class="note-list-top">
+                    <h2 id="listTitle">全部笔记</h2>
+                    <span class="count-badge" id="listCount"></span>
+                    <button class="sort-btn" id="sortBtn" type="button">
+                        <i data-lucide="arrow-down-wide-narrow"></i>
+                        最新
+                    </button>
+                </div>
+                <div class="search-wrap">
+                    <i data-lucide="search"></i>
+                    <input class="search-box" id="searchBox" type="search" placeholder="搜索笔记..." autocomplete="off">
+                </div>
+            </div>
+            <div class="note-items" id="noteItems"></div>
+        </section>
+
+        <!-- Editor Panel -->
+        <section class="editor-panel" id="editorPanel">
+            <div class="empty-state" id="editorEmpty">
+                <i data-lucide="file-text"></i>
+                <h3>选择或新建笔记</h3>
+                <p>从左侧选择一篇笔记开始编辑，<br>或点击「新建笔记」记录你的想法。</p>
+            </div>
+            <div id="editorContent" style="display:none; flex-direction:column; height:100%;">
+                <div class="editor-toolbar">
+                    <div class="toolbar-group">
+                        <button class="toolbar-btn" id="tbBold" type="button" title="粗体">
+                            <i data-lucide="bold"></i>
+                        </button>
+                        <button class="toolbar-btn" id="tbItalic" type="button" title="斜体">
+                            <i data-lucide="italic"></i>
+                        </button>
+                        <button class="toolbar-btn" id="tbStrike" type="button" title="删除线">
+                            <i data-lucide="strikethrough"></i>
+                        </button>
+                        <div class="toolbar-sep"></div>
+                        <button class="toolbar-btn" id="tbH1" type="button" title="标题1">
+                            <i data-lucide="heading-1"></i>
+                        </button>
+                        <button class="toolbar-btn" id="tbH2" type="button" title="标题2">
+                            <i data-lucide="heading-2"></i>
+                        </button>
+                        <div class="toolbar-sep"></div>
+                        <button class="toolbar-btn" id="tbList" type="button" title="列表">
+                            <i data-lucide="list"></i>
+                        </button>
+                        <button class="toolbar-btn" id="tbTask" type="button" title="待办">
+                            <i data-lucide="list-checks"></i>
+                        </button>
+                        <button class="toolbar-btn" id="tbQuote" type="button" title="引用">
+                            <i data-lucide="quote"></i>
+                        </button>
+                        <button class="toolbar-btn" id="tbCode" type="button" title="代码">
+                            <i data-lucide="code"></i>
+                        </button>
+                        <div class="toolbar-sep"></div>
+                        <button class="toolbar-btn" id="tbPreview" type="button" title="预览">
+                            <i data-lucide="eye"></i>
+                        </button>
+                    </div>
+                    <div class="toolbar-right">
+                        <select class="tag-select" id="tagSelect">
+                            <option value="">无标签</option>
+                            <option value="blue">工作</option>
+                            <option value="green">学习</option>
+                            <option value="purple">项目</option>
+                            <option value="orange">灵感</option>
+                            <option value="pink">生活</option>
+                            <option value="gray">归档</option>
+                        </select>
+                        <span class="word-count" id="wordCount">0 字</span>
+                    </div>
+                </div>
+                <div class="editor-area">
+                    <div class="editor-title-wrap">
+                        <input class="editor-title" id="editorTitle" type="text" placeholder="笔记标题">
+                    </div>
+                    <div class="editor-meta">
+                        <span id="editorNotebook">默认笔记本</span>
+                        <span class="editor-meta-sep">·</span>
+                        <span id="editorDate">刚刚创建</span>
+                        <span class="editor-meta-sep">·</span>
+                        <span id="editorTag" style="cursor:pointer;">添加标签</span>
+                    </div>
+                    <div class="editor-content-wrap">
+                        <textarea class="editor-content" id="editorTextarea" placeholder="开始记录你的想法...&#10;&#10;支持 Markdown 语法：&#10;# 标题  **粗体**  *斜体*  `代码`&#10;- 列表项  > 引用  ```代码块```"></textarea>
+                        <div class="preview-content" id="previewContent"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Dialog -->
+    <div class="dialog-backdrop" id="appDialog" hidden>
+        <section class="dialog-card">
+            <div class="dialog-top">
+                <div class="dialog-icon" id="dialogIcon">i</div>
+                <div class="dialog-copy">
+                    <h3 class="dialog-title" id="dialogTitle">确认</h3>
+                    <p class="dialog-message" id="dialogMessage">请确认操作。</p>
+                </div>
+                <button class="dialog-close-btn" id="dialogCloseBtn" type="button" aria-label="关闭">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <input class="dialog-input" id="dialogInput" type="text" style="display:none;" autocomplete="off">
+            <div class="dialog-colors" id="dialogColors" style="display:none;"></div>
+            <div class="dialog-actions">
+                <button class="dialog-btn secondary" id="dialogCancelBtn" type="button">取消</button>
+                <button class="dialog-btn primary" id="dialogConfirmBtn" type="button">确定</button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast-container" id="toastContainer"></div>
+
+
+    <script>
+    (function() {
+        'use strict';
+
+        // ===== Icon Helpers =====
+        const ICON_PATHS = {
+            'notebook-tabs': '<path d="M2 6h4l2-2h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="M6 4v16"/>',
+            'square-pen': '<path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.4 2.6a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/>',
+            'folder-plus': '<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/><path d="M12 10v6M9 13h6"/>',
+            'layout-grid': '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+            'star': '<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.9L12 17.8 5.8 21l1.2-6.9-5-4.9 6.9-1z"/>',
+            'clock-3': '<circle cx="12" cy="12" r="9"/><path d="M12 7v5h5"/>',
+            'trash-2': '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v5M14 11v5"/>',
+            'search': '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+            'file-text': '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/>',
+            'arrow-down-wide-narrow': '<path d="M12 4v16M8 16l4 4 4-4M4 4h16M4 9h10"/>',
+            'bold': '<path d="M6 4h7a4 4 0 0 1 0 8H6zM6 12h8a4 4 0 0 1 0 8H6z"/>',
+            'italic': '<path d="M19 4h-9M14 20H5M15 4 9 20"/>',
+            'strikethrough': '<path d="M16 4H9a3 3 0 0 0-2.8 4M14 12a4 4 0 0 1 0 8H6M4 12h16"/>',
+            'heading-1': '<path d="M4 12h8M4 18V6M12 18V6"/><path d="m17 12 3-2v8"/>',
+            'heading-2': '<path d="M4 12h8M4 18V6M12 18V6"/><path d="M21 18h-4c0-4 4-3 4-6 0-1.5-2-2.5-4-1"/>',
+            'list': '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+            'list-checks': '<path d="m3 17 2 2 4-4M3 7l2 2 4-4M13 6h8M13 12h8M13 18h8"/>',
+            'quote': '<path d="M3 21c3 0 7-1 7-8V5c0-1.25-.76-2.02-2-2H4c-1.25 0-2 .75-2 1.97V11c0 1.25.75 2 2 2h1v1c0 1-1 2-2 2v3c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.76-2.02-2-2h-4c-1.25 0-2 .75-2 1.97V11c0 1.25.75 2 2 2h1v1c0 1-1 2-2 2v3c0 1 0 1 1 1z"/>',
+            'code': '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>',
+            'eye': '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+            'pin': '<path d="M12 17v5M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.2V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.8a2 2 0 0 0-1.1-1.8l-1.8-.9A2 2 0 0 1 15 10.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+            'pencil': '<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+            'info': '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+            'circle-check': '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+            'triangle-alert': '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+            'x': '<path d="M18 6 6 18M6 6l12 12"/>'
+        };
+
+        function iconSvg(name, attrs = '') {
+            const path = ICON_PATHS[name] || ICON_PATHS['file-text'];
+            return `<svg data-lucide="${name}" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${attrs}>${path}</svg>`;
+        }
+
+        function icon(name, attrs = '') {
+            return iconSvg(name, attrs);
+        }
+
+        function refreshIcons() {
+            document.querySelectorAll('i[data-lucide]').forEach(el => {
+                el.outerHTML = iconSvg(el.getAttribute('data-lucide'));
+            });
+        }
+
+        // ===== Auth & API =====
+        const TOKEN_KEY = 'qz_admin_token';
+        const token = localStorage.getItem(TOKEN_KEY) || '';
+        if (!token) { location.replace('/admin/'); return; }
+
+        async function api(path, opts = {}) {
+            const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+            headers.Authorization = 'Bearer ' + token;
+            const res = await fetch(path, {
+                method: opts.method || (opts.body ? 'POST' : 'GET'),
+                headers,
+                body: opts.body ? JSON.stringify(opts.body) : undefined
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.status === 401) {
+                localStorage.removeItem(TOKEN_KEY);
+                location.replace('/admin/');
+                throw new Error('登录已失效');
+            }
+            if (!res.ok) {
+                const err = new Error(data.error || '请求失败');
+                err.status = res.status;
+                err.data = data;
+                throw err;
+            }
+            return data;
+        }
+
+        const TAGS = {
+            blue: { label: '工作', cls: 'tag-blue' },
+            green: { label: '学习', cls: 'tag-green' },
+            purple: { label: '项目', cls: 'tag-purple' },
+            orange: { label: '灵感', cls: 'tag-orange' },
+            pink: { label: '生活', cls: 'tag-pink' },
+            gray: { label: '归档', cls: 'tag-gray' },
+        };
+
+        // ===== State =====
+        let notes = [];
+        let notebooks = [];
+        let trashBin = [];
+        let currentView = 'all';
+        let activeNoteId = '';
+        let searchQuery = '';
+        let sortOrder = 'newest';
+        let isPreview = false;
+        let saveState = '';
+        let saveTimer = null;
+        let saving = false;
+        let pendingSave = false;
+
+        function parseDate(value) {
+            if (!value) return Date.now();
+            const normalized = String(value).replace(' ', 'T') + (String(value).includes('Z') ? '' : 'Z');
+            const time = new Date(normalized).getTime();
+            return Number.isNaN(time) ? Date.now() : time;
+        }
+
+        function mapBook(book) {
+            return { id: 'nb-' + book.id, dbId: book.id, label: book.name, color: book.color };
+        }
+
+        function mapNote(note) {
+            return {
+                id: String(note.id),
+                dbId: note.id,
+                notebook: note.notebookId ? 'nb-' + note.notebookId : '',
+                title: note.title || '',
+                content: note.content || '',
+                tag: note.tag || '',
+                pinned: !!note.pinned,
+                starred: !!note.starred,
+                status: note.status || 'normal',
+                version: Number(note.version) || 1,
+                createdAt: parseDate(note.createdAt),
+                updatedAt: parseDate(note.updatedAt)
+            };
+        }
+
+        function setSaveState(text) {
+            saveState = text || '';
+            if (typeof updateWordCount === 'function') updateWordCount();
+        }
+
+        function updateStorage() {
+            const fill = $('#storageFill');
+            const text = $('#storageText');
+            if (fill) fill.style.width = Math.min(100, Math.max(4, notes.length)) + '%';
+            if (text) text.textContent = notes.length + ' 篇笔记 · 云端同步';
+        }
+
+        async function loadData() {
+            try {
+                const [bookRes, noteRes, trashRes] = await Promise.all([
+                    api('/api/notes/books'),
+                    api('/api/notes?view=all'),
+                    api('/api/notes?view=trash')
+                ]);
+                notebooks = (bookRes.books || []).map(mapBook);
+                notes = (noteRes.notes || []).map(mapNote);
+                trashBin = (trashRes.notes || []).map(mapNote);
+                if (currentView.startsWith('nb-') && !notebooks.some(n => n.id === currentView)) currentView = 'all';
+                if (activeNoteId && !notes.some(n => n.id === activeNoteId) && !trashBin.some(n => n.id === activeNoteId)) activeNoteId = '';
+                updateStorage();
+                render();
+            } catch (e) {
+                showToast(e.message || '笔记加载失败', 'warning');
+            }
+        }
+
+        function scheduleSave(note) {
+            if (!note) return;
+            setSaveState('保存中...');
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(() => {
+                if (saving) { pendingSave = true; return; }
+                saveNote(note);
+            }, 800);
+        }
+
+        async function saveNote(note) {
+            if (!note || !note.dbId) return;
+            saving = true;
+            try {
+                const res = await api('/api/notes/' + note.dbId, {
+                    method: 'PATCH',
+                    body: {
+                        title: note.title,
+                        content: note.content,
+                        tag: note.tag,
+                        pinned: note.pinned,
+                        starred: note.starred,
+                        version: note.version
+                    }
+                });
+                Object.assign(note, mapNote(res.note));
+                setSaveState('已保存');
+                if (activeNoteId === note.id) editorDate.textContent = '修改于 ' + formatFullDate(note.updatedAt);
+                renderNoteList();
+            } catch (e) {
+                if (e.status === 409) {
+                    showToast('笔记已在其他窗口更新，正在刷新', 'warning');
+                    await loadData();
+                } else {
+                    setSaveState('保存失败');
+                    showToast(e.message || '保存失败', 'warning');
+                }
+            } finally {
+                saving = false;
+                if (pendingSave) {
+                    pendingSave = false;
+                    const current = notes.find(n => n.id === note.id) || trashBin.find(n => n.id === note.id);
+                    if (current && current.status === 'normal') scheduleSave(current);
+                }
+            }
+        }
+
+        // ===== DOM =====
+        const $ = s => document.querySelector(s);
+        const quickNav = $('#quickNav');
+        const notebookNav = $('#notebookNav');
+        const noteItems = $('#noteItems');
+        const listTitle = $('#listTitle');
+        const listCount = $('#listCount');
+        const searchBox = $('#searchBox');
+        const editorEmpty = $('#editorEmpty');
+        const editorContent = $('#editorContent');
+        const editorTitle = $('#editorTitle');
+        const editorTextarea = $('#editorTextarea');
+        const previewContent = $('#previewContent');
+        const editorNotebook = $('#editorNotebook');
+        const editorDate = $('#editorDate');
+        const editorTag = $('#editorTag');
+        const tagSelect = $('#tagSelect');
+        const wordCount = $('#wordCount');
+        const toastContainer = $('#toastContainer');
+
+        // ===== Utils =====
+        function escapeHtml(t) {
+            const m = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return t.replace(/[&<>"']/g, c => m[c]);
+        }
+
+        function formatTime(ts) {
+            const d = new Date(ts), now = new Date();
+            const diff = now - d;
+            if (diff < 60000) return '刚刚';
+            if (diff < 3600000) return Math.floor(diff / 60000) + ' 分钟前';
+            if (diff < 86400000) return Math.floor(diff / 3600000) + ' 小时前';
+            if (diff < 172800000) return '昨天';
+            if (diff < 604800000) return new Intl.DateTimeFormat('zh-CN', { weekday: 'short' }).format(d);
+            return new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric' }).format(d);
+        }
+
+        function formatFullDate(ts) {
+            return new Intl.DateTimeFormat('zh-CN', {
+                year: 'numeric', month: 'long', day: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            }).format(new Date(ts));
+        }
+
+
+        // ===== Toast =====
+        function showToast(msg, type = 'info') {
+            const icons = {
+                success: icon('circle-check'),
+                info: icon('info'),
+                warning: icon('triangle-alert'),
+            };
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.innerHTML = `${icons[type] || icons.info}<span>${escapeHtml(msg)}</span>`;
+            toastContainer.appendChild(t);
+            refreshIcons();
+            setTimeout(() => { t.classList.add('leaving'); t.addEventListener('animationend', () => t.remove()); }, 2400);
+        }
+
+        // ===== Dialog =====
+        let dlgResolver = null;
+        let dlgMode = 'confirm'; // confirm, prompt, notebook
+
+        function openDialog(opts) {
+            const { title = '确认', message = '', confirmText = '确定', cancelText = '取消', danger = false, mode = 'confirm', initialValue = '', colors = false } = opts;
+            dlgMode = mode;
+            $('#dialogTitle').textContent = title;
+            $('#dialogMessage').textContent = message;
+            $('#dialogConfirmBtn').textContent = confirmText;
+            $('#dialogCancelBtn').textContent = cancelText;
+            $('#dialogConfirmBtn').classList.toggle('danger', danger);
+            $('#dialogIcon').classList.toggle('danger', danger);
+            $('#dialogIcon').innerHTML = icon(danger ? 'triangle-alert' : (mode === 'prompt' ? 'pencil' : 'info'));
+            refreshIcons();
+
+            const inp = $('#dialogInput');
+            inp.style.display = mode === 'prompt' || mode === 'notebook' ? '' : 'none';
+            inp.value = initialValue || '';
+
+            const colorsEl = $('#dialogColors');
+            if (colors) {
+                colorsEl.style.display = 'flex';
+                colorsEl.innerHTML = '';
+                ['#2563eb','#10b981','#f59e0b','#ec4899','#8b5cf6','#6366f1','#14b8a6','#f43f5e'].forEach((c, i) => {
+                    const dot = document.createElement('div');
+                    dot.className = 'color-dot' + (i === 0 ? ' selected' : '');
+                    dot.style.background = c;
+                    dot.dataset.color = c;
+                    dot.addEventListener('click', () => {
+                        colorsEl.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
+                        dot.classList.add('selected');
+                    });
+                    colorsEl.appendChild(dot);
+                });
+            } else {
+                colorsEl.style.display = 'none';
+            }
+
+            const dlg = $('#appDialog');
+            dlg.hidden = false;
+            requestAnimationFrame(() => {
+                dlg.classList.add('visible');
+                if (mode === 'prompt' || mode === 'notebook') { inp.focus(); inp.select(); }
+            });
+            return new Promise(resolve => { dlgResolver = resolve; });
+        }
+
+        function closeDialog(result) {
+            if (!dlgResolver) return;
+            const dlg = $('#appDialog');
+            dlg.classList.remove('visible');
+            let value = result;
+            if (result && (dlgMode === 'prompt' || dlgMode === 'notebook')) {
+                const inp = $('#dialogInput').value.trim();
+                if (!inp) { dlgResolver(null); dlgResolver = null; return; }
+                if (dlgMode === 'notebook') {
+                    const selColor = $('#dialogColors').querySelector('.color-dot.selected');
+                    value = { name: inp, color: selColor ? selColor.dataset.color : '#2563eb' };
+                } else {
+                    value = inp;
+                }
+            }
+            setTimeout(() => { dlg.hidden = true; }, 200);
+            dlgResolver(value);
+            dlgResolver = null;
+        }
+
+        $('#dialogConfirmBtn').addEventListener('click', () => closeDialog(true));
+        $('#dialogCancelBtn').addEventListener('click', () => closeDialog(false));
+        $('#dialogCloseBtn').addEventListener('click', () => closeDialog(false));
+        $('#appDialog').addEventListener('click', e => { if (e.target === e.currentTarget) closeDialog(false); });
+        $('#dialogInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); closeDialog(true); } });
+
+        // ===== Markdown Parser =====
+        function parseMarkdown(text) {
+            let html = escapeHtml(text);
+
+            // Code blocks
+            html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => `<pre><code>${code.trim()}</code></pre>`);
+
+            // Inline code
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+            // Headers
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+            // Bold & italic
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+            html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+
+            // Blockquote
+            html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+            // Horizontal rule
+            html = html.replace(/^---$/gm, '<hr>');
+
+            // Task lists
+            html = html.replace(/^- \[x\] (.+)$/gm, '<li class="task-item"><span class="task-check checked"></span>$1</li>');
+            html = html.replace(/^- \[ \] (.+)$/gm, '<li class="task-item"><span class="task-check"></span>$1</li>');
+
+            // Unordered lists
+            html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+
+            // Ordered lists
+            html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+            // Wrap consecutive <li> in <ul>
+            html = html.replace(/((?:<li[^>]*>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+
+            // Links (only safe schemes)
+            html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => {
+                const raw = String(href).trim();
+                const safe = /^(https?:|mailto:|\/|#)/i.test(raw) ? raw : '#';
+                return `<a href="${safe}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+            });
+
+            // Tables
+            html = html.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)*)/gm, (_, header, sep, body) => {
+                const ths = header.split('|').filter(c => c.trim()).map(c => `<th>${c.trim()}</th>`).join('');
+                const rows = body.trim().split('\n').map(row => {
+                    const tds = row.split('|').filter(c => c.trim()).map(c => `<td>${c.trim()}</td>`).join('');
+                    return `<tr>${tds}</tr>`;
+                }).join('');
+                return `<table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:13px;"><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
+            });
+
+            // Paragraphs
+            html = html.replace(/\n\n/g, '</p><p>');
+            html = '<p>' + html + '</p>';
+            html = html.replace(/<p>\s*<(h[1-3]|ul|ol|pre|blockquote|hr|table)/g, '<$1');
+            html = html.replace(/<\/(h[1-3]|ul|ol|pre|blockquote|table)>\s*<\/p>/g, '</$1>');
+            html = html.replace(/<p>\s*<\/p>/g, '');
+
+            // Style table cells
+            html = html.replace(/<th>/g, '<th style="padding:8px 12px;border:1px solid rgba(148,163,184,0.3);text-align:left;font-weight:600;background:rgba(241,245,249,0.5);">');
+            html = html.replace(/<td>/g, '<td style="padding:8px 12px;border:1px solid rgba(148,163,184,0.3);">');
+
+            return html;
+        }
+
+        // ===== Get filtered notes =====
+        function getFilteredNotes() {
+            let items;
+            if (currentView === 'all') {
+                items = notes.filter(n => !trashBin.find(t => t.id === n.id));
+            } else if (currentView === 'starred') {
+                items = notes.filter(n => n.starred && !trashBin.find(t => t.id === n.id));
+            } else if (currentView === 'recent') {
+                items = notes.filter(n => !trashBin.find(t => t.id === n.id))
+                    .sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 10);
+            } else if (currentView === 'trash') {
+                items = trashBin;
+            } else if (currentView.startsWith('nb-')) {
+                items = notes.filter(n => n.notebook === currentView && !trashBin.find(t => t.id === n.id));
+            } else {
+                items = notes;
+            }
+
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                items = items.filter(n =>
+                    n.title.toLowerCase().includes(q) ||
+                    n.content.toLowerCase().includes(q)
+                );
+            }
+
+            // Sort (pinned always first)
+            items.sort((a, b) => {
+                if (a.pinned && !b.pinned) return -1;
+                if (!a.pinned && b.pinned) return 1;
+                if (sortOrder === 'newest') return b.updatedAt - a.updatedAt;
+                if (sortOrder === 'oldest') return a.updatedAt - b.updatedAt;
+                if (sortOrder === 'title') return a.title.localeCompare(b.title, 'zh-CN');
+                return 0;
+            });
+
+            return items;
+        }
+
+        // ===== Render Quick Nav =====
+        function renderQuickNav() {
+            const navItems = [
+                { id: 'all', label: '全部笔记', icon: 'layout-grid' },
+                { id: 'starred', label: '已收藏', icon: 'star' },
+                { id: 'recent', label: '最近编辑', icon: 'clock-3' },
+                { id: 'trash', label: '回收站', icon: 'trash-2' },
+            ];
+            quickNav.innerHTML = '';
+            navItems.forEach(item => {
+                const count = item.id === 'trash' ? trashBin.length :
+                    notes.filter(n => {
+                        if (item.id === 'starred') return n.starred && !trashBin.find(t => t.id === n.id);
+                        if (item.id === 'recent') return !trashBin.find(t => t.id === n.id);
+                        return !trashBin.find(t => t.id === n.id);
+                    }).length;
+
+                const btn = document.createElement('button');
+                btn.className = 'nav-item' + (currentView === item.id ? ' active' : '');
+                btn.type = 'button';
+                btn.innerHTML = `${icon(item.icon)}<span>${item.label}</span><span class="count">${item.id === 'all' ? notes.filter(n => !trashBin.find(t => t.id === n.id)).length : (item.id === 'trash' ? trashBin.length : count)}</span>`;
+                btn.addEventListener('click', () => {
+                    currentView = item.id;
+                    activeNoteId = '';
+                    searchQuery = '';
+                    searchBox.value = '';
+                    render();
+                });
+                quickNav.appendChild(btn);
+            });
+        }
+
+        // ===== Render Notebook Nav =====
+        function renderNotebookNav() {
+            notebookNav.innerHTML = '';
+            notebooks.forEach(nb => {
+                const count = notes.filter(n => n.notebook === nb.id && !trashBin.find(t => t.id === n.id)).length;
+                const btn = document.createElement('button');
+                btn.className = 'nav-item' + (currentView === nb.id ? ' active' : '');
+                btn.type = 'button';
+                btn.innerHTML = `<span class="notebook-dot" style="background:${nb.color};"></span><span>${nb.label}</span><span class="count">${count}</span>`;
+                btn.addEventListener('click', () => {
+                    currentView = nb.id;
+                    activeNoteId = '';
+                    searchQuery = '';
+                    searchBox.value = '';
+                    render();
+                });
+                // Right-click to rename/delete
+                btn.addEventListener('contextmenu', e => {
+                    e.preventDefault();
+                    showNotebookMenu(nb, btn);
+                });
+                notebookNav.appendChild(btn);
+            });
+        }
+
+        async function showNotebookMenu(nb, btn) {
+            const action = await openDialog({
+                title: '管理笔记本',
+                message: `选择对「${nb.label}」的操作`,
+                confirmText: '删除',
+                cancelText: '关闭',
+                danger: true,
+                mode: 'confirm'
+            });
+            if (action) {
+                try {
+                    await api('/api/notes/books/' + nb.dbId, { method: 'DELETE' });
+                    notebooks = notebooks.filter(n => n.id !== nb.id);
+                    if (currentView === nb.id) currentView = 'all';
+                    showToast('笔记本已删除', 'success');
+                    render();
+                } catch (e) {
+                    showToast(e.message || '笔记本删除失败', 'warning');
+                }
+            }
+        }
+
+        // ===== Render Note List =====
+        function renderNoteList() {
+            const viewLabels = {
+                all: '全部笔记', starred: '已收藏', recent: '最近编辑', trash: '回收站'
+            };
+            const nb = notebooks.find(n => n.id === currentView);
+            listTitle.textContent = viewLabels[currentView] || (nb ? nb.label : '全部笔记');
+
+            const items = getFilteredNotes();
+            listCount.textContent = `${items.length} 篇`;
+
+            noteItems.innerHTML = '';
+
+            if (!items.length) {
+                noteItems.innerHTML = `
+                    <div class="empty-state" style="padding:40px 20px;">
+                        ${icon('file-text', 'style="width:44px;height:44px;"')}
+                        <h3 style="font-size:15px;">暂无笔记</h3>
+                        <p style="font-size:12px;">${searchQuery ? '没有匹配的笔记' : '点击「新建笔记」开始记录'}</p>
+                    </div>`;
+                refreshIcons();
+                return;
+            }
+
+            items.forEach(note => {
+                const card = document.createElement('button');
+                card.className = 'note-card' + (note.id === activeNoteId ? ' active' : '');
+                card.type = 'button';
+
+                const plainPreview = note.content
+                    .replace(/#{1,3}\s/g, '')
+                    .replace(/\*\*(.+?)\*\*/g, '$1')
+                    .replace(/\*(.+?)\*/g, '$1')
+                    .replace(/`([^`]+)`/g, '$1')
+                    .replace(/```[\s\S]*?```/g, '')
+                    .replace(/[-*>|]/g, '')
+                    .replace(/\[.\]\s/g, '')
+                    .replace(/\n+/g, ' ')
+                    .trim()
+                    .slice(0, 120);
+
+                const tagHtml = note.tag && TAGS[note.tag]
+                    ? `<span class="note-tag ${TAGS[note.tag].cls}">${TAGS[note.tag].label}</span>` : '';
+
+                const pinHtml = note.pinned
+                    ? `<span class="pin-icon">${icon('pin')}</span>` : '';
+
+                card.innerHTML = `
+                    <div class="note-card-title">${pinHtml}${escapeHtml(note.title || '无标题')}</div>
+                    <div class="note-card-preview">${escapeHtml(plainPreview) || '空笔记'}</div>
+                    <div class="note-card-footer">
+                        ${tagHtml}
+                        <span>${formatTime(note.updatedAt)}</span>
+                    </div>
+                    ${currentView === 'trash' ? '' : `<button class="star-toggle ${note.starred ? 'starred' : ''}" data-id="${note.id}">
+                        ${icon('star', note.starred ? 'fill="currentColor"' : '')}
+                    </button>`}
+                `;
+
+                card.addEventListener('click', e => {
+                    if (e.target.closest('.star-toggle')) return;
+                    activeNoteId = note.id;
+                    isPreview = false;
+                    render();
+                });
+
+                const starBtn = card.querySelector('.star-toggle');
+                if (starBtn) starBtn.addEventListener('click', async e => {
+                    e.stopPropagation();
+                    const next = !note.starred;
+                    try {
+                        const res = await api('/api/notes/' + note.dbId, { method: 'PATCH', body: { starred: next, version: note.version } });
+                        note.starred = next;
+                        note.version = Number(res.note.version) || note.version + 1;
+                        note.updatedAt = parseDate(res.note.updatedAt);
+                        showToast(next ? '已收藏' : '已取消收藏', 'success');
+                        render();
+                    } catch (err) {
+                        showToast(err.message || '操作失败', 'warning');
+                    }
+                });
+
+                noteItems.appendChild(card);
+            });
+            refreshIcons();
+        }
+
+        // ===== Render Editor =====
+        function renderEditor() {
+            const note = notes.find(n => n.id === activeNoteId) || trashBin.find(n => n.id === activeNoteId);
+            if (!note) {
+                editorEmpty.style.display = '';
+                editorContent.style.display = 'none';
+                return;
+            }
+            editorEmpty.style.display = 'none';
+            editorContent.style.display = 'flex';
+
+            editorTitle.value = note.title;
+            editorTextarea.value = note.content;
+
+            const nb = notebooks.find(n => n.id === note.notebook);
+            editorNotebook.textContent = nb ? nb.label : '未分类';
+            editorDate.textContent = '修改于 ' + formatFullDate(note.updatedAt);
+
+            tagSelect.value = note.tag || '';
+            const tagLabel = note.tag && TAGS[note.tag] ? TAGS[note.tag].label : '';
+            editorTag.textContent = tagLabel || '添加标签';
+            editorTag.style.color = tagLabel ? '' : '#94a3b8';
+
+            updateWordCount();
+            updatePreview();
+            togglePreviewMode(false);
+        }
+
+        function updateWordCount() {
+            const text = editorTextarea.value;
+            const chars = text.replace(/\s/g, '').length;
+            wordCount.textContent = `${chars} 字${saveState ? ' · ' + saveState : ''}`;
+        }
+
+        function updatePreview() {
+            previewContent.innerHTML = parseMarkdown(editorTextarea.value);
+        }
+
+        function togglePreviewMode(force) {
+            isPreview = force !== undefined ? force : !isPreview;
+            const tbPreview = $('#tbPreview');
+
+            if (isPreview) {
+                updatePreview();
+                editorTextarea.style.display = 'none';
+                previewContent.style.display = 'block';
+                tbPreview.classList.add('active');
+            } else {
+                editorTextarea.style.display = '';
+                previewContent.style.display = 'none';
+                tbPreview.classList.remove('active');
+            }
+        }
+
+        // ===== Main Render =====
+        function render() {
+            renderQuickNav();
+            renderNotebookNav();
+            renderNoteList();
+            renderEditor();
+            refreshIcons();
+        }
+
+        // ===== Search =====
+        searchBox.addEventListener('input', () => {
+            searchQuery = searchBox.value.trim();
+            renderNoteList();
+        });
+
+        // ===== Sort =====
+        const sortOrders = ['newest', 'oldest', 'title'];
+        const sortLabels = { newest: '最新', oldest: '最早', title: '标题' };
+        $('#sortBtn').addEventListener('click', () => {
+            const idx = sortOrders.indexOf(sortOrder);
+            sortOrder = sortOrders[(idx + 1) % sortOrders.length];
+            $('#sortBtn').innerHTML = `
+                ${icon('arrow-down-wide-narrow')}
+                ${sortLabels[sortOrder]}
+            `;
+            renderNoteList();
+        });
+
+        // ===== New Note =====
+        $('#newNoteBtn').addEventListener('click', async () => {
+            const nbId = currentView.startsWith('nb-') ? currentView : (notebooks[0]?.id || '');
+            try {
+                const res = await api('/api/notes', { method: 'POST', body: { notebookId: nbId, title: '', content: '' } });
+                const note = mapNote(res.note);
+                notes.unshift(note);
+                activeNoteId = note.id;
+                if (!currentView.startsWith('nb-') && currentView !== 'all' && currentView !== 'recent') currentView = 'all';
+                updateStorage();
+                render();
+                editorTitle.focus();
+                showToast('新笔记已创建', 'success');
+            } catch (e) {
+                showToast(e.message || '新建笔记失败', 'warning');
+            }
+        });
+
+        // ===== Editor Events =====
+
+        editorTitle.addEventListener('input', () => {
+            const note = notes.find(n => n.id === activeNoteId);
+            if (!note) return;
+            note.title = editorTitle.value;
+            note.updatedAt = Date.now();
+            renderNoteList();
+            scheduleSave(note);
+        });
+
+        editorTextarea.addEventListener('input', () => {
+            const note = notes.find(n => n.id === activeNoteId);
+            if (!note) return;
+            note.content = editorTextarea.value;
+            note.updatedAt = Date.now();
+            updateWordCount();
+            if (isPreview) updatePreview();
+            scheduleSave(note);
+        });
+
+        // Tab key support in textarea
+        editorTextarea.addEventListener('keydown', e => {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = editorTextarea.selectionStart;
+                const end = editorTextarea.selectionEnd;
+                editorTextarea.value = editorTextarea.value.substring(0, start) + '    ' + editorTextarea.value.substring(end);
+                editorTextarea.selectionStart = editorTextarea.selectionEnd = start + 4;
+                editorTextarea.dispatchEvent(new Event('input'));
+            }
+        });
+
+        tagSelect.addEventListener('change', () => {
+            const note = notes.find(n => n.id === activeNoteId);
+            if (!note) return;
+            note.tag = tagSelect.value;
+            note.updatedAt = Date.now();
+            const tagLabel = note.tag && TAGS[note.tag] ? TAGS[note.tag].label : '';
+            editorTag.textContent = tagLabel || '添加标签';
+            editorTag.style.color = tagLabel ? '' : '#94a3b8';
+            renderNoteList();
+            scheduleSave(note);
+            showToast(tagLabel ? `标签已设为「${tagLabel}」` : '已移除标签', 'info');
+        });
+
+        // ===== Toolbar Actions =====
+        function insertText(before, after = '') {
+            if (isPreview) return;
+            const start = editorTextarea.selectionStart;
+            const end = editorTextarea.selectionEnd;
+            const selected = editorTextarea.value.substring(start, end);
+            const replacement = before + (selected || '文本') + after;
+            editorTextarea.value = editorTextarea.value.substring(0, start) + replacement + editorTextarea.value.substring(end);
+            editorTextarea.selectionStart = start + before.length;
+            editorTextarea.selectionEnd = start + before.length + (selected || '文本').length;
+            editorTextarea.focus();
+            editorTextarea.dispatchEvent(new Event('input'));
+        }
+
+        function insertLine(prefix) {
+            if (isPreview) return;
+            const start = editorTextarea.selectionStart;
+            const val = editorTextarea.value;
+            const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+            const needNewline = lineStart > 0 && val[lineStart - 1] !== '\n' ? '' : '';
+            editorTextarea.value = val.substring(0, lineStart) + needNewline + prefix + val.substring(lineStart);
+            editorTextarea.selectionStart = editorTextarea.selectionEnd = lineStart + needNewline.length + prefix.length;
+            editorTextarea.focus();
+            editorTextarea.dispatchEvent(new Event('input'));
+        }
+
+        $('#tbBold').addEventListener('click', () => insertText('**', '**'));
+        $('#tbItalic').addEventListener('click', () => insertText('*', '*'));
+        $('#tbStrike').addEventListener('click', () => insertText('~~', '~~'));
+        $('#tbH1').addEventListener('click', () => insertLine('# '));
+        $('#tbH2').addEventListener('click', () => insertLine('## '));
+        $('#tbList').addEventListener('click', () => insertLine('- '));
+        $('#tbTask').addEventListener('click', () => insertLine('- [ ] '));
+        $('#tbQuote').addEventListener('click', () => insertLine('> '));
+        $('#tbCode').addEventListener('click', () => insertText('`', '`'));
+        $('#tbPreview').addEventListener('click', () => togglePreviewMode());
+
+        // ===== Pin note (double-click title) =====
+        editorTitle.addEventListener('dblclick', async () => {
+            const note = notes.find(n => n.id === activeNoteId);
+            if (!note) return;
+            const next = !note.pinned;
+            try {
+                const res = await api('/api/notes/' + note.dbId, { method: 'PATCH', body: { pinned: next, version: note.version } });
+                note.pinned = next;
+                note.version = Number(res.note.version) || note.version + 1;
+                note.updatedAt = parseDate(res.note.updatedAt);
+                showToast(next ? '已置顶' : '已取消置顶', 'success');
+                renderNoteList();
+            } catch (e) {
+                showToast(e.message || '操作失败', 'warning');
+            }
+        });
+
+        // ===== Keyboard Shortcuts =====
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                if ($('#appDialog').classList.contains('visible')) { closeDialog(false); return; }
+            }
+            if (e.ctrlKey && e.key.toLowerCase() === 'k') {
+                e.preventDefault(); searchBox.focus();
+            }
+            if (e.ctrlKey && e.key.toLowerCase() === 'n') {
+                e.preventDefault(); $('#newNoteBtn').click();
+            }
+            // Toolbar shortcuts
+            if (e.ctrlKey && document.activeElement === editorTextarea) {
+                if (e.key === 'b') { e.preventDefault(); insertText('**', '**'); }
+                if (e.key === 'i') { e.preventDefault(); insertText('*', '*'); }
+                if (e.key === 'p') { e.preventDefault(); togglePreviewMode(); }
+            }
+        });
+
+        // ===== Add Notebook =====
+        $('#addNotebookBtn').addEventListener('click', async () => {
+            const result = await openDialog({
+                title: '新建笔记本',
+                message: '输入笔记本名称并选择颜色',
+                confirmText: '创建',
+                mode: 'notebook',
+                colors: true,
+            });
+            if (!result) return;
+            try {
+                const res = await api('/api/notes/books', { method: 'POST', body: { name: result.name, color: result.color } });
+                const nb = mapBook(res.book);
+                notebooks.push(nb);
+                showToast(`笔记本「${nb.label}」已创建`, 'success');
+                render();
+            } catch (e) {
+                showToast(e.message || '创建笔记本失败', 'warning');
+            }
+        });
+
+        // ===== Editor right-click: pin / move / delete =====
+        $('#editorPanel').addEventListener('contextmenu', async e => {
+            const note = notes.find(n => n.id === activeNoteId) || trashBin.find(n => n.id === activeNoteId);
+            if (!note) return;
+            e.preventDefault();
+
+            const isTrash = currentView === 'trash';
+            const action = await openDialog({
+                title: isTrash ? '管理笔记' : '笔记操作',
+                message: isTrash
+                    ? `「${note.title || '无标题'}」在回收站中。恢复或永久删除？`
+                    : `「${note.title || '无标题'}」：选择操作`,
+                confirmText: isTrash ? '永久删除' : '删除到回收站',
+                cancelText: isTrash ? '恢复到笔记' : '取消',
+                danger: !isTrash,
+            });
+
+            try {
+                if (isTrash) {
+                    if (action === false) {
+                        await api('/api/notes/' + note.dbId + '/restore', { method: 'POST' });
+                        trashBin = trashBin.filter(n => n.id !== note.id);
+                        showToast('笔记已恢复', 'success');
+                        activeNoteId = '';
+                        await loadData();
+                    } else if (action === true) {
+                        await api('/api/notes/' + note.dbId + '/purge', { method: 'DELETE' });
+                        trashBin = trashBin.filter(n => n.id !== note.id);
+                        showToast('笔记已永久删除', 'success');
+                        activeNoteId = '';
+                        await loadData();
+                    }
+                } else if (action === true) {
+                    await api('/api/notes/' + note.dbId, { method: 'DELETE' });
+                    notes = notes.filter(n => n.id !== note.id);
+                    trashBin.unshift({ ...note, status: 'trash' });
+                    activeNoteId = '';
+                    showToast('笔记已移至回收站', 'success');
+                    updateStorage();
+                    render();
+                }
+            } catch (e) {
+                showToast(e.message || '操作失败', 'warning');
+            }
+        });
+
+        // ===== Init =====
+        loadData();
+    })();
+    </script>
+</body>
+</html>

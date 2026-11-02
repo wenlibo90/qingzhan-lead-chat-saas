@@ -615,3 +615,34 @@ CREATE TABLE IF NOT EXISTS referral_withdrawals (
   processed_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_ref_withdrawals ON referral_withdrawals(account_id, status);
+
+CREATE TABLE IF NOT EXISTS note_books (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL,
+  owner_user_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT '#2563eb',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_note_books_owner ON note_books(tenant_id, owner_user_id, sort_order);
+
+CREATE TABLE IF NOT EXISTS notes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL,
+  owner_user_id INTEGER NOT NULL,
+  notebook_id INTEGER,
+  title TEXT NOT NULL DEFAULT '',
+  content TEXT NOT NULL DEFAULT '',
+  tag TEXT,
+  pinned INTEGER NOT NULL DEFAULT 0,
+  starred INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'normal',
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_notes_owner ON notes(tenant_id, owner_user_id, status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_notes_notebook ON notes(tenant_id, owner_user_id, notebook_id, status);

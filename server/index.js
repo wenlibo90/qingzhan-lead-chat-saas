@@ -13,6 +13,7 @@ const visitorRoutes = require('./routes/visitors');
 const leadRoutes = require('./routes/leads');
 const reportRoutes = require('./routes/reports');
 const analyticsRoutes = require('./routes/analytics');
+const notesRoutes = require('./routes/notes');
 const configRoutes = require('./routes/config');
 const settingsRoutes = require('./routes/settings');
 const externalRoutes = require('./routes/external');
@@ -122,6 +123,7 @@ app.use('/api/conversations', conversationRoutes);
 app.use('/api/visitors', visitorRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/notes', notesRoutes);
 app.use('/api', reportRoutes);
 app.use('/api', configRoutes);
 app.use('/api', settingsRoutes);
@@ -136,6 +138,7 @@ app.get('/r/:code', (req, res) => {
   res.redirect(302, '/?signup=1&ref=' + encodeURIComponent(code));
 });
 app.get(['/promote', '/promote/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'promote.html')));
+app.get(['/notes', '/notes/'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'notes.html')));
 app.get(['/signup', '/signup/'], (req, res) => {
   const ref = String(req.query.ref || '').trim();
   res.redirect(302, '/?signup=1' + (ref ? '&ref=' + encodeURIComponent(ref) : ''));

@@ -5,6 +5,7 @@
 - 访客挂件：右下角客服、实时聊天、主动触发、知识库、录屏、公告、广告拦截检测
 - 客户管理后台：会话接待、访客 360 档案、线索 CRM、报表、自动化、知识库、站点/挂件配置、团队权限、套餐与工单
 - 网站分析：流量概览、实时数据、来源、内容、受众、事件与 Web Vitals，支持环比、趋势和 CSV 导出
+- 云笔记：个人笔记、笔记本、搜索、收藏、置顶、回收站与自动保存；后台菜单新标签页打开，共用客户登录
 - 对外落地页：产品介绍、套餐价格、接入教程、案例、自助注册与团队演示申请
 - 平台运营后台：注册账号、工作空间、试用/订阅、订单收入、申请线索、支持工单、风控、平台成员与操作审计
 - 双线增长：个人站长自助注册 + 团队/企业销售申请，共用一套挂件与业务引擎
@@ -148,7 +149,7 @@ PQL 由生命周期任务每小时评估：工作空间已安装 JS、访客数�
 | 认证 | scrypt 密码哈希 + HMAC-SHA256 签名 Token；账号与工作空间成员分离，平台运营独立认证域 |
 | 前端 | 原生 ES5/ES2017 + Apollo UI（玻璃拟态），无构建步骤 |
 | 实时 | WebSocket，房间模型 `tenant:*` / `conv:*` / `agent:*` |
-| 测试 | Node 脚本冒烟测试（143 项）+ Playwright 浏览器测试（42 项） |
+| 测试 | Node 脚本冒烟测试（154 项）+ Playwright 浏览器测试（43 项） |
 
 ## 目录结构
 
@@ -162,7 +163,7 @@ server/
   socket.js           访客/客服实时协议
   upload.js           文件上传
   routes/             public / payments / auth / signup / onboarding / ops / support /
-                      conversations / visitors / leads / analytics / reports / config / settings / external / landing
+                      conversations / visitors / leads / analytics / notes / reports / config / settings / external / landing
   services/           geo / scoring / presence / analytics / ratify / notify / ai / provision / lifecycle /
                       billing / pql
   test/               smoke.js / ui.js
@@ -176,6 +177,7 @@ public/
   demo/               演示宿主站点
   privacy.html        隐私说明
   terms.html          服务条款
+  notes.html          云笔记（同源、共用登录，后台新标签页打开）
   assets/             Apollo UI 与落地页样式
 data/                 SQLite 数据库（运行时生成）
 uploads/              上传文件（运行时生成）
@@ -208,10 +210,10 @@ docs/ARCHITECTURE.md  架构、数据库与接口规划
 # 需先启动服务
 npm start
 
-# API + 实时通讯冒烟测试（143 项）
+# API + 实时通讯冒烟测试（154 项）
 npm test
 
-# 浏览器端到端测试（42 项，需要 Playwright Chromium）
+# 浏览器端到端测试（43 项，需要 Playwright Chromium）
 npx playwright install chromium
 npm run test:ui
 ```

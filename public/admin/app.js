@@ -299,6 +299,7 @@
       title: '工作台', items: [
         { key: 'onboarding', label: '接入向导', icon: 'target', roles: ['admin', 'operator', 'agent'] },
         { key: 'dashboard', label: '数据概览', icon: 'dashboard', feature: 'basic_stats', roles: ['admin', 'operator', 'agent'] },
+        { key: 'notes', label: '云笔记', icon: 'book', roles: ['admin', 'operator', 'agent'], external: '/notes' },
         { key: 'analytics', label: '网站分析', icon: 'chart', feature: 'source_stats', roles: ['admin', 'operator'] },
         { key: 'conversations', label: '会话接待', icon: 'chat', feature: 'chat', roles: ['admin', 'operator', 'agent'], badge: 'chat' },
         { key: 'visitors', label: '访客档案', icon: 'users', feature: 'visitor_profile_basic', roles: ['admin', 'operator', 'agent'] },
@@ -610,7 +611,7 @@
       if (!items.length) return '';
       return '<div class="nav-group"><div class="nav-group-title">' + A.esc(A.t(group.title)) + '</div>' + items.map(function (it) {
         var locked = it.feature && !A.can(it.feature);
-        return '<button class="nav-item' + (locked ? ' locked' : '') + '" data-nav="' + it.key + '">' +
+        return '<button class="nav-item' + (locked ? ' locked' : '') + '" data-nav="' + it.key + '"' + (it.external ? ' data-external="' + A.esc(it.external) + '"' : '') + '>' +
           '<span class="n-ico">' + A.icon(it.icon, 17) + '</span><span class="n-label">' + A.esc(A.t(it.label)) + '</span>' +
           (locked ? '<span class="n-lock">' + A.featureNeeded(it.feature) + '</span>' : '') +
           (it.badge === 'chat' && A.state.pendingConv ? '<span class="n-badge">' + (A.state.pendingConv > 99 ? '99+' : A.state.pendingConv) + '</span>' : '') +
@@ -623,6 +624,12 @@
       '<nav class="side-nav">' + navHtml + '</nav>';
     A.$$('[data-nav]', side).forEach(function (btn) {
       btn.addEventListener('click', function () {
+        var external = btn.getAttribute('data-external');
+        if (external) {
+          window.open(external, '_blank', 'noopener');
+          side.classList.remove('open');
+          return;
+        }
         A.go(btn.getAttribute('data-nav'));
         side.classList.remove('open');
       });

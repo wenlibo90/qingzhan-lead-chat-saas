@@ -213,6 +213,19 @@ function log(name) { console.log(`  ok  ${++step}. ${name}`); }
     log('管理后台页面：' + title);
   }
 
+  // cloud notes opens in a new tab with the shared login
+  const notesNav = admin.locator('[data-nav="notes"]');
+  if (await notesNav.count()) {
+    const [notesPage] = await Promise.all([ctx.waitForEvent('page'), notesNav.click()]);
+    await notesPage.waitForLoadState('networkidle');
+    await notesPage.waitForTimeout(1200);
+    if (!(await notesPage.title()).includes('云笔记')) throw new Error('notes page title missing');
+    if (await notesPage.locator('#notebookNav .nav-item').count() < 1) throw new Error('notes notebooks missing');
+    await notesPage.screenshot({ path: SHOTS + '/10-admin-notes.png', fullPage: true });
+    await notesPage.close();
+    log('云笔记新标签页与共享登录');
+  }
+
   // billing order flow
   await admin.locator('[data-nav="billing"]').click();
   await admin.waitForTimeout(1100);
